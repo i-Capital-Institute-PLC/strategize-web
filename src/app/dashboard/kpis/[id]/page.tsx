@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@apollo/client";
 import {
@@ -14,12 +14,16 @@ import {
   Flag,
   Layers3,
   Network,
+  Pencil,
   Scale,
   Target,
   TrendingUp,
+  UserPlus,
   UserRound,
   Users,
 } from "lucide-react";
+import { CreateKpiDialog } from "@/components/kpis/CreateKpiDialog";
+import KpiAssignmentDialog from "@/components/kpis/KpiAssignmentDialog";
 import { GET_KPI, GET_KPI_UPDATES } from "@/lib/graphql/queries/kpis";
 import { GET_KPI_ASSIGNMENT_BREAKDOWN } from "@/lib/graphql/queries/kpi-detail";
 import { GET_KPI_FORMULA_DEFINITIONS } from "@/lib/graphql/queries/kpi-formulas";
@@ -310,7 +314,10 @@ export default function KpiDetailPage() {
   const router = useRouter();
   const kpiId = params.id as string;
 
-  const { data: kpiData, loading: kpiLoading, error: kpiError } = useQuery(GET_KPI, {
+  const [editOpen, setEditOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+
+  const { data: kpiData, loading: kpiLoading, error: kpiError, refetch: refetchKpi } = useQuery(GET_KPI, {
     variables: { kpiId },
     fetchPolicy: "cache-and-network",
   });
@@ -628,6 +635,25 @@ export default function KpiDetailPage() {
               </div>
             </div>
 
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-[#3838EC] hover:bg-[#2e2ed1] text-white"
+                onClick={() => setAssignOpen(true)}
+              >
+                <UserPlus className="h-4 w-4" />
+                Assign
+              </Button>
+            </div>
           </div>
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
@@ -1055,6 +1081,38 @@ export default function KpiDetailPage() {
           </Card>
         )}
       </div>
+
+      {editOpen && (
+        <CreateKpiDialog
+          open={editOpen}
+          onOpenChange={(open: boolean) => {
+            setEditOpen(open);
+            if (!open) refetchKpi();
+          }}
+          organizationId={organizationId || ""}
+          editKpi={kpi as any}
+        />
+      )}
+
+      {assignOpen && strategicPeriodId && (
+        <KpiAssignmentDialog
+          kpi={{
+            kpiId: kpi.kpiId,
+            name: kpi.name,
+            targetValue: kpi.targetValue,
+            measurementUnit: kpi.measurementUnit,
+            unitType: kpi.unitType,
+            calculationBasisSource: kpi.calculationBasisSource,
+          }}
+          strategicPeriodId={strategicPeriodId}
+          onSuccess={() => {
+            setAssignOpen(false);
+            refetchKpi();
+          }}
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+        />
+      )}
     </div>
   );
 }

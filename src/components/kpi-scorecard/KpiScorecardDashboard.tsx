@@ -109,13 +109,15 @@ export default function KpiScorecardDashboard() {
           >
             Department
           </TabsTrigger>
-          <TabsTrigger
-            value="division"
-            disabled={!canViewDivision}
-            className="shrink-0 text-xs sm:text-sm"
-          >
-            Division
-          </TabsTrigger>
+          {role !== "MANAGER" && (
+            <TabsTrigger
+              value="division"
+              disabled={!canViewDivision}
+              className="shrink-0 text-xs sm:text-sm"
+            >
+              Division
+            </TabsTrigger>
+          )}
           <TabsTrigger
             value="corporate"
             disabled={!canReadAll}

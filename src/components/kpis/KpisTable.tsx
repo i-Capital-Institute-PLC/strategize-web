@@ -250,7 +250,7 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
                   {...getHeaderProps("status")}
                 />
               </TableHead>
-              <TableHead className="font-semibold w-[50px]" />
+              <TableHead className="font-semibold w-[50px] sticky right-0 bg-background/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -353,7 +353,7 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
                     )}
                   </TableCell>
 
-                  <TableActions>
+                  <TableActions className="sticky right-0 bg-background/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className={tableIconButtonClassName}>

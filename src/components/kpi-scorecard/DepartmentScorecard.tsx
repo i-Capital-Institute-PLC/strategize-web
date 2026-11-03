@@ -430,16 +430,16 @@ export default function DepartmentScorecard({
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-                <table className={`w-full min-w-[720px] ${stickyFirstColumnTableClassName}`}>
+                <table className={`w-full min-w-[900px] ${stickyFirstColumnTableClassName}`}>
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-3 font-medium">
+                      <th className="text-left p-3 font-medium min-w-[180px]">
                         <SortableFilterableHeader
                           label="KPI Name"
                           {...getHeaderProps("name")}
                         />
                       </th>
-                      <th className="text-center p-3 font-medium">
+                      <th className="text-center p-3 font-medium min-w-[110px]">
                         <SortableFilterableHeader
                           label="Mode"
                           align="center"
@@ -453,7 +453,7 @@ export default function DepartmentScorecard({
                           {...getHeaderProps("mode")}
                         />
                       </th>
-                      <th className="text-center p-3 font-medium">
+                      <th className="text-center p-3 font-medium min-w-[220px]">
                         Quarterly Performance
                       </th>
                       <th className="text-right p-3 font-medium">

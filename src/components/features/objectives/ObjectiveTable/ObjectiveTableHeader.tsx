@@ -81,7 +81,7 @@ const ObjectiveTableHeader: React.FC<ObjectiveTableHeaderProps> = ({
                     />
                 </TableHead>
 
-                <TableHead className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider px-6 py-3 w-16 text-right">
+                <TableHead className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider px-6 py-3 w-16 text-right sticky right-0 bg-background/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]">
                     Actions
                 </TableHead>
             </TableRow>

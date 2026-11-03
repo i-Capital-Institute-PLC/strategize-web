@@ -35,6 +35,14 @@ import { GET_DIVISIONS } from "@/lib/graphql/queries/divisions";
 import { GET_DEPARTMENTS } from "@/lib/graphql/queries/departments";
 import { GET_EMPLOYEES } from "@/lib/graphql/queries/employees";
 import { useSelectedStrategicPeriod } from "@/stores/strategicPeriodStore";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { User, Users } from "lucide-react";
 
 
 export default function ObjectivesApprovalTable() {
@@ -58,6 +66,8 @@ function ObjectivesApprovalTableContent() {
     Objective[] | null
   >(null);
   const [activeTab, setActiveTab] = useState<string>("corporate");
+  const [selectedPersonnelEmployeeId, setSelectedPersonnelEmployeeId] =
+    useState<string>("all");
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "asc" | "desc";
@@ -92,6 +102,12 @@ function ObjectivesApprovalTableContent() {
   const isCoordinator = guards.isCoordinator;
   // Every personal view must use personal assignment filtering, not just NORMAL.
   const isEmployee = !showTabs;
+
+  useEffect(() => {
+    if (userEmployeeId && (isManager || isCoordinator)) {
+      setSelectedPersonnelEmployeeId(userEmployeeId);
+    }
+  }, [userEmployeeId, isManager, isCoordinator]);
 
   // Determine the assigneeId based on the user role and selected organizational unit
   const getAssigneeId = (): string | undefined => {
@@ -409,41 +425,6 @@ function ObjectivesApprovalTableContent() {
 
       const myDeptIds = managedDepartmentIds || [];
 
-      // Build set of division IDs the manager can access
-      const myDivisionIds = new Set<string>();
-
-      // 1. Get divisions from manager's departments
-      if (departmentsData?.departments?.items) {
-        departmentsData.departments.items.forEach((dept: any) => {
-          if (
-            myDeptIds.includes(dept.departmentId) &&
-            dept.division?.divisionId
-          ) {
-            myDivisionIds.add(dept.division.divisionId);
-          }
-        });
-      }
-
-      // 2. Include the currently selected unit (division or department's division)
-      if (selectedUnitId) {
-        if (selectedUnitType === "division") {
-          myDivisionIds.add(selectedUnitId);
-        } else if (selectedUnitType === "department") {
-          // Find the division this department belongs to
-          const dept = departmentsData?.departments?.items?.find(
-            (d: any) => d.departmentId === selectedUnitId,
-          );
-          if (dept?.division?.divisionId) {
-            myDivisionIds.add(dept.division.divisionId);
-          }
-        }
-      }
-
-      console.log("🔍 [ObjectivesFilter] Manager accessible divisions", {
-        myDivisionIds: Array.from(myDivisionIds),
-        myDeptIds: myDeptIds,
-      });
-
       filtered = filtered.filter((obj) => {
         // Show objectives explicitly assigned to manager's departments
         if (
@@ -454,18 +435,23 @@ function ObjectivesApprovalTableContent() {
           return true;
         }
 
-        // Show objectives assigned to manager's accessible divisions
+        // Show objectives assigned directly to the manager personally (Dawit Solomon)
         if (
-          obj.assigneeType === "DIVISION" &&
-          obj.assigneeId &&
-          myDivisionIds.has(obj.assigneeId)
+          (obj.assigneeType === "PERSONNEL" ||
+            obj.assigneeType === "EMPLOYEE" ||
+            obj.type === "PERSONNEL") &&
+          obj.assigneeId === userEmployeeId
         ) {
-          console.log("✅ [ObjectivesFilter] DIVISION match", obj.title);
+          console.log("✅ [ObjectivesFilter] MANAGER PERSONAL match", obj.title);
           return true;
         }
 
-        // Show personnel objectives that are children of manager's department objectives
-        if (obj.assigneeType === "PERSONNEL") {
+        // Show personnel objectives that belong to manager's department team members
+        if (
+          obj.assigneeType === "PERSONNEL" ||
+          obj.assigneeType === "EMPLOYEE" ||
+          obj.type === "PERSONNEL"
+        ) {
           const parentObj = objectives.find(
             (o) => o.objectiveId === obj.parent?.objectiveId,
           );
@@ -475,23 +461,10 @@ function ObjectivesApprovalTableContent() {
             myDeptIds.includes(parentObj.assigneeId || "");
           if (match)
             console.log("✅ [ObjectivesFilter] PERSONNEL match", obj.title);
-          return match;
+          return Boolean(match);
         }
 
-        // Show parent division/corporate objectives for context (top-level only, no assigneeType)
-        if (!obj.assigneeType && !obj.assigneeId) {
-          const match = !obj.parent;
-          if (match)
-            console.log("✅ [ObjectivesFilter] CONTEXT match", obj.title);
-          return match;
-        }
-
-        console.log(
-          "❌ [ObjectivesFilter] No match",
-          obj.title,
-          obj.type,
-          obj.assigneeType,
-        );
+        // Managers do NOT manage divisions; division objectives are hidden
         return false;
       });
     } else if (isDirector) {
@@ -643,21 +616,8 @@ function ObjectivesApprovalTableContent() {
       setActiveTab("division");
       setHasSetDefaultTab(true);
     } else if (isManager || isCoordinator) {
-      // For managers and coordinators, check if they have division or department objectives
-      // Default to division if they have division objectives, otherwise department
-      const hasDivisionObjectives = objectives.some(
-        (o) =>
-          o.assigneeType === "DIVISION" &&
-          o.assigneeId &&
-          selectedUnitType === "division" &&
-          selectedUnitId === o.assigneeId,
-      );
-
-      if (hasDivisionObjectives) {
-        setActiveTab("division");
-      } else {
-        setActiveTab("department");
-      }
+      // For managers and coordinators, always default to department tab
+      setActiveTab("department");
       setHasSetDefaultTab(true);
     } else if (isEmployee) {
       setActiveTab("personnel");
@@ -757,11 +717,119 @@ function ObjectivesApprovalTableContent() {
     setOrderedObjectives(finalFullList);
   };
 
-  // Client-side pagination after filtering and sorting
-  const totalItems = sortedObjectives.length;
+  const getObjectiveLevelKey = (objective: Objective) => {
+    const type = String(objective.type || "").toUpperCase();
+    const assigneeType = String(objective.assigneeType || "").toUpperCase();
+
+    if (type === "CORPORATE" || assigneeType === "CORPORATE") {
+      return "corporate";
+    }
+    if (assigneeType === "DIVISION" || type === "DIVISION") {
+      return "division";
+    }
+    if (assigneeType === "DEPARTMENT" || type === "DEPARTMENT") {
+      return "department";
+    }
+    if (
+      assigneeType === "PERSONNEL" ||
+      assigneeType === "EMPLOYEE" ||
+      type === "PERSONNEL"
+    ) {
+      return "personnel";
+    }
+
+    // Legacy top-level corporate objectives usually have no assignee data.
+    if (!objective.assigneeType && !objective.assigneeId && !objective.parent) {
+      return "corporate";
+    }
+
+    return "unknown";
+  };
+
+  // Group objectives by effective hierarchy level for tabs.
+  const corporateObjectives = useMemo(() => {
+    return sortedObjectives.filter(
+      (o) => getObjectiveLevelKey(o) === "corporate",
+    );
+  }, [sortedObjectives]);
+
+  const divisionObjectives = useMemo(() => {
+    return sortedObjectives.filter(
+      (o) => getObjectiveLevelKey(o) === "division",
+    );
+  }, [sortedObjectives]);
+
+  const departmentObjectives = useMemo(() => {
+    return sortedObjectives.filter(
+      (o) => getObjectiveLevelKey(o) === "department",
+    );
+  }, [sortedObjectives]);
+
+  const personnelObjectives = useMemo(() => {
+    return sortedObjectives.filter(
+      (o) => getObjectiveLevelKey(o) === "personnel",
+    );
+  }, [sortedObjectives]);
+
+  // List of unique assignees in personnel objectives
+  const personnelAssignees = useMemo(() => {
+    const map = new Map<string, string>();
+    if (userEmployeeId) {
+      map.set(
+        userEmployeeId,
+        user?.fullName ? `${user.fullName} (You)` : "My Personal Objectives",
+      );
+    }
+    personnelObjectives.forEach((obj) => {
+      if (obj.assigneeId && !map.has(obj.assigneeId)) {
+        map.set(
+          obj.assigneeId,
+          unitNames[obj.assigneeId] || `Employee (${obj.assigneeId.slice(0, 8)})`,
+        );
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [personnelObjectives, userEmployeeId, user?.fullName, unitNames]);
+
+  const displayedPersonnelObjectives = useMemo(() => {
+    if (selectedPersonnelEmployeeId === "all") {
+      return personnelObjectives;
+    }
+    return personnelObjectives.filter(
+      (obj) => obj.assigneeId === selectedPersonnelEmployeeId,
+    );
+  }, [personnelObjectives, selectedPersonnelEmployeeId]);
+
+  const currentTabObjectives = useMemo(() => {
+    if (!showTabs) return sortedObjectives;
+    switch (activeTab) {
+      case "corporate":
+        return corporateObjectives;
+      case "division":
+        return divisionObjectives;
+      case "department":
+        return departmentObjectives;
+      case "personnel":
+        return displayedPersonnelObjectives;
+      default:
+        return sortedObjectives;
+    }
+  }, [
+    showTabs,
+    activeTab,
+    corporateObjectives,
+    divisionObjectives,
+    departmentObjectives,
+    displayedPersonnelObjectives,
+    sortedObjectives,
+  ]);
+
+  // Client-side pagination after tab filtering and sorting
+  const tabFilteredObjectives = showTabs ? currentTabObjectives : sortedObjectives;
+  const totalItems = tabFilteredObjectives.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const pagedObjectives = sortedObjectives.slice(
+  const pagedObjectives = tabFilteredObjectives.slice(
     startIndex,
     startIndex + itemsPerPage,
   );
@@ -883,127 +951,112 @@ function ObjectivesApprovalTableContent() {
     });
   };
 
-  const getObjectiveLevelKey = (objective: Objective) => {
-    const type = String(objective.type || "").toUpperCase();
-    const assigneeType = String(objective.assigneeType || "").toUpperCase();
-
-    if (type === "CORPORATE" || assigneeType === "CORPORATE") {
-      return "corporate";
+  const tabWeightInfo = useMemo(() => {
+    if (activeTab === "corporate") {
+      const group = corporateObjectives.filter(isTopLevelCorporateObjective);
+      const total = group.reduce((sum, obj) => {
+        const objKPIs = kpis.filter(
+          (k) =>
+            k.objective?.objectiveId === obj.objectiveId &&
+            k.status !== "REJECTED",
+        );
+        return (
+          sum + objKPIs.reduce((kpiSum, kpi) => kpiSum + (kpi.weight || 0), 0)
+        );
+      }, 0);
+      return { total, label: "STRATEGIC WEIGHT BUDGET", isOver: total > 100, note: undefined };
     }
-    if (assigneeType === "DIVISION" || type === "DIVISION") {
-      return "division";
+    if (activeTab === "division") {
+      const total = divisionObjectives.reduce((sum, obj) => {
+        const objKPIs = kpis.filter(
+          (k) =>
+            k.objective?.objectiveId === obj.objectiveId &&
+            k.status !== "REJECTED",
+        );
+        return (
+          sum + objKPIs.reduce((kpiSum, kpi) => kpiSum + (kpi.weight || 0), 0)
+        );
+      }, 0);
+      return { total, label: "DIVISION WEIGHT BUDGET", isOver: total > 100, note: undefined };
     }
-    if (assigneeType === "DEPARTMENT" || type === "DEPARTMENT") {
-      return "department";
+    if (activeTab === "department") {
+      const total = departmentObjectives.reduce((sum, obj) => {
+        const objKPIs = kpis.filter(
+          (k) =>
+            k.objective?.objectiveId === obj.objectiveId &&
+            k.status !== "REJECTED",
+        );
+        return (
+          sum + objKPIs.reduce((kpiSum, kpi) => kpiSum + (kpi.weight || 0), 0)
+        );
+      }, 0);
+      return { total, label: "DEPARTMENT WEIGHT BUDGET", isOver: total > 100, note: undefined };
     }
-    if (
-      assigneeType === "PERSONNEL" ||
-      assigneeType === "EMPLOYEE" ||
-      type === "PERSONNEL"
-    ) {
-      return "personnel";
+    if (activeTab === "personnel") {
+      if (selectedPersonnelEmployeeId === "all") {
+        // When viewing all team members, calculate the maximum weight assigned to any single employee
+        // rather than summing across multiple individuals into an artificial over-allocation.
+        const perEmployeeWeights = new Map<string, number>();
+        personnelObjectives.forEach((obj) => {
+          const ownerId = obj.assigneeId || "unassigned";
+          const objKPIs = kpis.filter(
+            (k) =>
+              k.objective?.objectiveId === obj.objectiveId &&
+              k.status !== "REJECTED",
+          );
+          const weight = objKPIs.reduce(
+            (sum, kpi) => sum + (kpi.weight || 0),
+            0,
+          );
+          perEmployeeWeights.set(
+            ownerId,
+            (perEmployeeWeights.get(ownerId) || 0) + weight,
+          );
+        });
+        const maxWeight = Math.max(0, ...perEmployeeWeights.values());
+        return {
+          total: maxWeight,
+          label: "MAX EMPLOYEE WEIGHT",
+          isOver: maxWeight > 100,
+          note: `${perEmployeeWeights.size} team members (max allocated)`,
+        };
+      } else {
+        const singleEmpObjectives = personnelObjectives.filter(
+          (obj) => obj.assigneeId === selectedPersonnelEmployeeId,
+        );
+        const total = singleEmpObjectives.reduce((sum, obj) => {
+          const objKPIs = kpis.filter(
+            (k) =>
+              k.objective?.objectiveId === obj.objectiveId &&
+              k.status !== "REJECTED",
+          );
+          return (
+            sum + objKPIs.reduce((kpiSum, kpi) => kpiSum + (kpi.weight || 0), 0)
+          );
+        }, 0);
+        const isMe = selectedPersonnelEmployeeId === userEmployeeId;
+        return {
+          total,
+          label: isMe ? "MY PERSONAL WEIGHT BUDGET" : "EMPLOYEE WEIGHT BUDGET",
+          isOver: total > 100,
+          note: undefined,
+        };
+      }
     }
 
-    // Legacy top-level corporate objectives usually have no assignee data.
-    if (!objective.assigneeType && !objective.assigneeId && !objective.parent) {
-      return "corporate";
-    }
-
-    return "unknown";
-  };
-
-  // Group objectives by effective hierarchy level for tabs.
-  const corporateObjectives = useMemo(() => {
-    const filtered = sortedObjectives.filter(
-      (o) => getObjectiveLevelKey(o) === "corporate",
-    );
-    console.log("🔍 [TabFilter] Corporate objectives", {
-      count: filtered.length,
-      objectives: filtered.map((o) => o.title),
-    });
-    return filtered;
-  }, [sortedObjectives]);
-
-  const divisionObjectives = useMemo(() => {
-    const filtered = sortedObjectives.filter(
-      (o) => getObjectiveLevelKey(o) === "division",
-    );
-    console.log("🔍 [TabFilter] Division objectives", {
-      count: filtered.length,
-      objectives: filtered.map((o) => o.title),
-    });
-    return filtered;
-  }, [sortedObjectives]);
-
-  const departmentObjectives = useMemo(() => {
-    const filtered = sortedObjectives.filter(
-      (o) => getObjectiveLevelKey(o) === "department",
-    );
-    console.log("🔍 [TabFilter] Department objectives", {
-      count: filtered.length,
-      objectives: filtered.map((o) => o.title),
-    });
-    return filtered;
-  }, [sortedObjectives]);
-
-  const personnelObjectives = useMemo(() => {
-    const filtered = sortedObjectives.filter(
-      (o) => getObjectiveLevelKey(o) === "personnel",
-    );
-    console.log("🔍 [TabFilter] Personnel objectives", {
-      count: filtered.length,
-      objectives: filtered.map((o) => o.title),
-    });
-    return filtered;
-  }, [sortedObjectives]);
-
-  // Corporate tab: only top-level corporate objectives (exclude cascaded assignees)
-  const cumulativeTabWeight = useMemo(() => {
-    const group =
-      activeTab === "corporate"
-        ? corporateObjectives.filter(isTopLevelCorporateObjective)
-        : activeTab === "division"
-          ? divisionObjectives
-          : activeTab === "department"
-            ? departmentObjectives
-            : personnelObjectives;
-
-    return group.reduce((total, obj) => {
-      const objKPIs = kpis.filter(
-        (k) =>
-          k.objective?.objectiveId === obj.objectiveId &&
-          k.status !== "REJECTED",
-      );
-      return total + objKPIs.reduce((sum, kpi) => sum + (kpi.weight || 0), 0);
-    }, 0);
+    return { total: 0, label: "WEIGHT BUDGET", isOver: false, note: undefined };
   }, [
     activeTab,
+    selectedPersonnelEmployeeId,
     corporateObjectives,
     divisionObjectives,
     departmentObjectives,
     personnelObjectives,
     kpis,
+    userEmployeeId,
   ]);
 
-  const getPagedObjectivesForTab = (group: Objective[]) => {
-    const total = group.length;
-    const currentTabTotalPages = Math.max(1, Math.ceil(total / itemsPerPage));
-    const start = (currentPage - 1) * itemsPerPage;
-    const paged = group.slice(start, start + itemsPerPage);
-    console.log("🔍 [Pagination] Paging objectives", {
-      activeTab,
-      totalInGroup: total,
-      currentPage,
-      itemsPerPage,
-      pagedCount: paged.length,
-      objectives: paged.map((o) => ({
-        id: o.objectiveId,
-        title: o.title,
-        type: o.type,
-      })),
-    });
-    return paged;
-  };
+  const cumulativeTabWeight = tabWeightInfo.total;
 
   return (
     <div className="flex flex-col gap-6 px-2 md:px-6">
@@ -1035,72 +1088,122 @@ function ObjectivesApprovalTableContent() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/50 backdrop-blur-sm p-2 rounded-lg border border-gray-100 shadow-sm sticky top-0 z-10">
           {showTabs ? (
-            <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-1">
-              {["corporate", "division", "department", "personnel"]
-                .filter((tab) => {
-                  // Only ADMIN and SUPER_ADMIN can see corporate tab
-                  if (isCorporateRole) return true;
-                  // Directors and Managers can see division, department, and personnel tabs
-                  if (guards.isDirector || guards.isManager || guards.isCoordinator)
-                    return ["division", "department", "personnel"].includes(
-                      tab,
-                    );
-                  return false;
-                })
-                .map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => {
-                      setActiveTab(tab);
+            <div className="flex flex-wrap items-center gap-3 overflow-x-auto custom-scrollbar pb-1">
+              <div className="flex gap-1">
+                {["corporate", "division", "department", "personnel"]
+                  .filter((tab) => {
+                    // Only ADMIN and SUPER_ADMIN can see corporate tab
+                    if (isCorporateRole) return true;
+                    // Directors can see division, department, and personnel tabs
+                    if (guards.isDirector)
+                      return ["division", "department", "personnel"].includes(
+                        tab,
+                      );
+                    // Managers and Coordinators can ONLY see department and personnel tabs
+                    if (guards.isManager || guards.isCoordinator)
+                      return ["department", "personnel"].includes(tab);
+                    return false;
+                  })
+                  .map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => {
+                        setActiveTab(tab);
+                        setCurrentPage(1);
+                      }}
+                      className={`px-6 py-2.5 text-sm font-medium rounded-md whitespace-nowrap transition-all duration-200 ${
+                        activeTab === tab
+                          ? "bg-blue-600 text-white shadow-md transform scale-105"
+                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      }`}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)} Objectives
+                    </button>
+                  ))}
+              </div>
+
+              {/* Assignee filter when viewing Personnel tab */}
+              {activeTab === "personnel" && (isManager || isCoordinator || isDirector) && (
+                <div className="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200 dark:border-gray-700">
+                  <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
+                    Assignee:
+                  </span>
+                  <Select
+                    value={selectedPersonnelEmployeeId}
+                    onValueChange={(val) => {
+                      setSelectedPersonnelEmployeeId(val);
                       setCurrentPage(1);
                     }}
-                    className={`px-6 py-2.5 text-sm font-medium rounded-md whitespace-nowrap transition-all duration-200 ${
-                      activeTab === tab
-                        ? "bg-blue-600 text-white shadow-md transform scale-105"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                    }`}
                   >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)} Objectives
-                  </button>
-                ))}
+                    <SelectTrigger className="w-[210px] h-9 text-xs bg-white dark:bg-card">
+                      <SelectValue placeholder="Select assignee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {userEmployeeId && (
+                        <SelectItem value={userEmployeeId}>
+                          {user?.fullName ? `${user.fullName} (You)` : "My Personal Objectives"}
+                        </SelectItem>
+                      )}
+                      <SelectItem value="all">
+                        All Team Members ({personnelObjectives.length})
+                      </SelectItem>
+                      {personnelAssignees
+                        .filter((a) => a.id !== userEmployeeId)
+                        .map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex-1" />
           )}
 
           {/* Level Weight Progress Tracker */}
-          <div className="flex flex-col gap-1 min-w-[200px] px-2">
+          <div className="flex flex-col gap-1 min-w-[220px] px-2">
             <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider">
               <span
                 className={
-                  cumulativeTabWeight > 100
+                  tabWeightInfo.isOver
                     ? "text-red-600"
                     : "text-gray-500"
                 }
               >
-                STRATEGIC WEIGHT BUDGET
+                {tabWeightInfo.label}
               </span>
               <span
                 className={
-                  cumulativeTabWeight > 100
+                  tabWeightInfo.isOver
                     ? "text-red-600 font-bold animate-pulse"
                     : "text-blue-600"
                 }
               >
-                {cumulativeTabWeight.toFixed(1)}% / 100%
+                {tabWeightInfo.total.toFixed(1)}% / 100%
               </span>
             </div>
             <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden shadow-inner border border-gray-100">
               <div
-                className={`h-full transition-all duration-500 ease-out rounded-full ${cumulativeTabWeight > 100 ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"}`}
-                style={{ width: `${Math.min(cumulativeTabWeight, 105)}%` }}
+                className={`h-full transition-all duration-500 ease-out rounded-full ${
+                  tabWeightInfo.isOver
+                    ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                    : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                }`}
+                style={{ width: `${Math.min(tabWeightInfo.total, 105)}%` }}
               />
             </div>
-            {cumulativeTabWeight > 100 && (
+            {tabWeightInfo.isOver ? (
               <p className="text-[10px] text-red-500 font-medium text-right">
                 ⚠️ Cumulative limit exceeded!
               </p>
-            )}
+            ) : tabWeightInfo.note ? (
+              <p className="text-[10px] text-muted-foreground text-right">
+                {tabWeightInfo.note}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1159,17 +1262,7 @@ function ObjectivesApprovalTableContent() {
 
       {/* Table */}
       <ObjectiveTable
-        objectives={
-          showTabs
-            ? activeTab === "corporate"
-              ? getPagedObjectivesForTab(corporateObjectives)
-              : activeTab === "division"
-                ? getPagedObjectivesForTab(divisionObjectives)
-                : activeTab === "department"
-                  ? getPagedObjectivesForTab(departmentObjectives)
-                  : getPagedObjectivesForTab(personnelObjectives)
-            : pagedObjectives
-        }
+        objectives={pagedObjectives}
         allObjectives={allObjectivesForLookup} // Use broad set to resolve parent KPI names
         kpis={kpis}
         selected={selected}
@@ -1206,11 +1299,17 @@ function ObjectivesApprovalTableContent() {
         emptyTitle={
           selectedPeriodId
             ? `No objectives in ${selectedPeriodLabel}.`
+            : activeTab === "personnel" &&
+              selectedPersonnelEmployeeId === userEmployeeId
+            ? "No personal objectives assigned."
             : "No objectives found."
         }
         emptyDescription={
           selectedPeriodId
             ? "Objectives are shown only for the exact period or quarter where they were created."
+            : activeTab === "personnel" &&
+              selectedPersonnelEmployeeId === userEmployeeId
+            ? "You do not have individual personal objectives assigned yet. Your department objectives are available under the Department tab, or select 'All Team Members' to view your team's cascaded objectives."
             : "Change your filters or add a new objective."
         }
         childQuartersByParentId={(function () {

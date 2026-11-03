@@ -45,13 +45,31 @@ export function ManagerKpiDashboard({
     return { aggregated, direct, hybrid };
   }, [kpis]);
 
-  const stats = useMemo(() => ({
-    totalKpis: kpis.length,
-    aggregatedCount: groupedKpis.aggregated.length,
-    directCount: groupedKpis.direct.length,
-    hybridCount: groupedKpis.hybrid.length,
-    totalWeight: kpis.reduce((sum, k) => sum + (k.weight || 0), 0),
-  }), [kpis, groupedKpis]);
+  // Group KPIs by owner (assigneeId / employee) to compute per-employee weight
+  const perEmployeeWeights = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const k of kpis) {
+      const ownerId = (k as any).assigneeId ?? currentUserId ?? "unassigned";
+      map.set(ownerId, (map.get(ownerId) ?? 0) + (k.weight || 0));
+    }
+    return map;
+  }, [kpis, currentUserId]);
+
+  const stats = useMemo(() => {
+    // Max weight across employees (a single employee's weights should sum to ~100)
+    const maxEmployeeWeight = Math.max(0, ...perEmployeeWeights.values());
+    return {
+      totalKpis: kpis.length,
+      aggregatedCount: groupedKpis.aggregated.length,
+      directCount: groupedKpis.direct.length,
+      hybridCount: groupedKpis.hybrid.length,
+      // Show the heaviest single employee's weight sum (representative of "is any one employee over-allocated?")
+      maxEmployeeWeight,
+      // Raw dept total for reference
+      totalWeight: kpis.reduce((sum, k) => sum + (k.weight || 0), 0),
+      employeeCount: perEmployeeWeights.size,
+    };
+  }, [kpis, groupedKpis, perEmployeeWeights]);
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -64,9 +82,19 @@ export function ManagerKpiDashboard({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalKpis}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalWeight}% total weight
-            </p>
+            <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+              {stats.employeeCount > 1 ? (
+                <>
+                  <span>{stats.employeeCount} assignees</span>
+                  <span>·</span>
+                  <span className={stats.maxEmployeeWeight > 100 ? "text-amber-600 font-medium" : ""}>
+                    Max {stats.maxEmployeeWeight}% / person
+                  </span>
+                </>
+              ) : (
+                <span>{stats.totalWeight}% total weight</span>
+              )}
+            </div>
           </CardContent>
         </Card>
 

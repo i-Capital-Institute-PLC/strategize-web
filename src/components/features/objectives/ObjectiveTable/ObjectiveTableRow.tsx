@@ -213,7 +213,7 @@ const ObjectiveTableRow: React.FC<ObjectiveTableRowProps> = ({
                 {new Date(objective.createdAt).toLocaleDateString()}
             </TableCell>
 
-            <TableCell className="px-6 py-4 text-gray-600" onClick={(e) => e.stopPropagation()}>
+            <TableCell className="px-6 py-4 text-gray-600 sticky right-0 bg-background/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-2">
                     {onViewObjective && (
                         <Button
