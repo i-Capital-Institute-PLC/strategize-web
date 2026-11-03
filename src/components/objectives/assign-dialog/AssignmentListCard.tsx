@@ -17,7 +17,7 @@ interface Assignment {
 interface AssignmentListCardProps {
   assignments: Assignment[];
   kpis: Kpi[];
-  onRemoveAssignment: (index: number) => void;
+  onRemoveAssignment: (assigneeId: string) => void;
 }
 
 export function AssignmentListCard({
@@ -39,9 +39,9 @@ export function AssignmentListCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="max-h-60 overflow-y-auto space-y-2">
-          {assignments.map((assignment, index) => (
+          {assignments.map((assignment) => (
             <div
-              key={index}
+              key={assignment.assigneeId}
               className="flex items-center justify-between p-3 bg-white border border-green-200 rounded-lg"
             >
               <div className="flex-1">
@@ -68,7 +68,7 @@ export function AssignmentListCard({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onRemoveAssignment(index)}
+                onClick={() => onRemoveAssignment(assignment.assigneeId)}
                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
               >
                 Remove

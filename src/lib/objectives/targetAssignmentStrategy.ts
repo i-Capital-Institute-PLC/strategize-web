@@ -19,18 +19,18 @@ export function getTargetAssignmentStrategy(
     | "unitType"
   >,
 ): TargetAssignmentStrategy {
+  if (kpi.calculationBasisSource === "DIRECT_VALUE") {
+    return "DIRECT_BASIS_RATE";
+  }
+  if (kpi.calculationBasisSource === "LINKED_KPI") {
+    return "LINKED_BASIS_RATE";
+  }
   if (kpi.calculationType === "RATIO_FORMULA") return "FORMULA_RATIO";
   if (
     kpi.calculationType === "SCALAR_FORMULA" ||
     kpi.calculationType === "WEIGHTED_INDEX"
   ) {
     return "FORMULA_RESULT";
-  }
-  if (kpi.calculationBasisSource === "DIRECT_VALUE") {
-    return "DIRECT_BASIS_RATE";
-  }
-  if (kpi.calculationBasisSource === "LINKED_KPI") {
-    return "LINKED_BASIS_RATE";
   }
   if (kpi.aggregationMethod === "SIMPLE_AVERAGE") return "SCORE_AVERAGE";
   if (kpi.aggregationMethod === "DENOMINATOR_WEIGHTED_AVERAGE") {
@@ -51,7 +51,7 @@ export function getTargetAssignmentDescription(
     case "FORMULA_RESULT":
       return "Assign each child its expected calculated result. The approved formula is inherited and reconciled from that child's source plans.";
     case "DIRECT_BASIS_RATE":
-      return "Repeat the parent rate for every child and allocate the approved denominator exactly across those children.";
+      return "Repeat the parent rate for every child and allocate the planned deliverables across those children.";
     case "LINKED_BASIS_RATE":
       return "Repeat the parent rate for every child and cascade the linked denominator KPI to every matching child.";
     case "WEIGHTED_COMPONENT_RATE":

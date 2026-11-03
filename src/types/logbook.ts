@@ -131,12 +131,23 @@ export interface LogbookKpiOption {
   calculationBasisSource?: "NONE" | "DIRECT_VALUE" | "LINKED_KPI" | null;
   actualBasisSource?: KpiActualBasisSource | null;
   directBasisValue?: string | null;
+  directBasisTargets?: Array<{
+    timeline: string;
+    value: string;
+  }> | null;
+  targets?: Array<{
+    timeline: string;
+    target: number;
+  }> | null;
   numeratorLabel?: string | null;
   denominatorLabel?: string | null;
   basisUnitType?: string | null;
   quarterPlans?: Array<{
     quarterNumber: number;
+    timeline?: string | null;
+    effectiveTarget?: number | null;
     directBasisTarget?: string | null;
+    status?: string | null;
   }>;
   objective?: {
     type?: string | null;

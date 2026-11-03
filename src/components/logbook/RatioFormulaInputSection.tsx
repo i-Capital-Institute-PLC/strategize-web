@@ -17,6 +17,8 @@ interface RatioFormulaInputSectionProps {
   unitType?: string;
   disabled?: boolean;
   targetValue?: number; // KPI target for achievement calculation
+  readOnlyDenominator?: boolean;
+  approvedQuotaMessage?: string;
 }
 
 export function RatioFormulaInputSection({
@@ -30,6 +32,8 @@ export function RatioFormulaInputSection({
   unitType,
   disabled = false,
   targetValue,
+  readOnlyDenominator = false,
+  approvedQuotaMessage,
 }: RatioFormulaInputSectionProps) {
   // Calculate live preview
   const calculatedResult = useMemo(() => {
@@ -107,22 +111,31 @@ export function RatioFormulaInputSection({
 
         {/* Denominator Input */}
         <div className="space-y-2">
-          <Label htmlFor="denominator" className="text-sm font-medium">
-            {displayLabel(denominatorLabel, "Denominator")}
-            <span className="text-red-500 ml-1">*</span>
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="denominator" className="text-sm font-medium">
+              {displayLabel(denominatorLabel, "Denominator")}
+              <span className="text-red-500 ml-1">*</span>
+            </Label>
+            {readOnlyDenominator && (
+              <span className="text-xs text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                Locked
+              </span>
+            )}
+          </div>
           <FormattedNumberInput
             id="denominator"
             value={denominatorValue}
-            onValueChange={onDenominatorChange}
+            onValueChange={readOnlyDenominator ? () => {} : onDenominatorChange}
             placeholder="0"
-            disabled={disabled}
-            className="w-full"
+            disabled={disabled || readOnlyDenominator}
+            className={`w-full ${readOnlyDenominator ? "bg-slate-50 text-slate-700 cursor-not-allowed" : ""}`}
           />
           <p className="text-xs text-muted-foreground">
-            {denominatorLabel 
-              ? `Enter ${denominatorLabel.toLowerCase()}`
-              : "Enter the denominator value (cannot be zero)"}
+            {readOnlyDenominator
+              ? (approvedQuotaMessage || "Approved quarterly quota locked")
+              : denominatorLabel 
+                ? `Enter ${denominatorLabel.toLowerCase()}`
+                : "Enter the denominator value (cannot be zero)"}
           </p>
         </div>
       </div>

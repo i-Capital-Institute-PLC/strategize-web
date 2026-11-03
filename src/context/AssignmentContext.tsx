@@ -18,10 +18,27 @@ export interface Assignment {
   kpis: string[]; // KPI IDs to be assigned
 }
 
+export interface ExistingAllocation {
+  assigneeId: string;
+  assigneeType?: string;
+  assigneeName?: string;
+  targetValue: number;
+  directBasisValue?: string;
+}
+
+export interface ExistingKpiAllocations {
+  totalTarget: number;
+  totalBasis: number;
+  allocations: ExistingAllocation[];
+}
+
 interface AssignmentContextType {
   // Configuration
   sourceObjective: Objective | null;
   availableKPIs: Kpi[];
+
+  // Existing Allocations from prior sessions
+  existingAllocationsByKpiId: Record<string, ExistingKpiAllocations>;
 
   // Search & Filter State
   searchTerm: string;
@@ -45,15 +62,10 @@ interface AssignmentContextType {
   // Assignments State (The list of "staged" assignments)
   assignments: Assignment[];
   addAssignment: (assignment: Assignment) => void;
-  removeAssignment: (index: number) => void;
+  removeAssignment: (assigneeId: string) => void;
   clearAssignments: () => void;
 
   // Target values for assignments (kpiId -> assigneeId -> value)
-  // We use a flat structure or nested map. Let's stick to the hook's original pattern or improve.
-  // The original hook used `updateTargetAssignment` on a Ref or state.
-  // Let's keep it simple: We need to store targets for the *staged* assignments.
-  // actually, the original code stored targets in a separate state managed by `useAssignmentState`.
-  // We will bring that here.
   targets: Record<string, Record<string, number | null>>; // kpiId -> { assigneeId: targetValue }
   setTarget: (kpiId: string, assigneeId: string, value: number | null) => void;
   directBasisAllocations: Record<string, Record<string, string>>;
@@ -76,10 +88,12 @@ export function AssignmentProvider({
   children,
   objective,
   kpis,
+  existingAllocations = {},
 }: {
   children: React.ReactNode;
   objective: Objective;
   kpis: Kpi[];
+  existingAllocations?: Record<string, ExistingKpiAllocations>;
 }) {
   // State
   const [searchTerm, setSearchTerm] = useState("");
@@ -158,16 +172,10 @@ export function AssignmentProvider({
           selectedKpi?.calculationBasisSource === "LINKED_KPI"
             ? selectedKpi.weightingBasisKpiId
             : null;
-        const linkedBasisIsAssignable = assignableKPIs.some(
-          (kpi) => kpi.kpiId === linkedBasisId,
-        );
-        return [
-          ...new Set([
-            ...prev,
-            id,
-            ...(linkedBasisId && linkedBasisIsAssignable ? [linkedBasisId] : []),
-          ]),
-        ];
+        if (linkedBasisId && !prev.includes(linkedBasisId)) {
+          return [...prev, id, linkedBasisId];
+        }
+        return [...prev, id];
       });
     },
     [assignableKPIs],
@@ -181,30 +189,61 @@ export function AssignmentProvider({
   );
 
   const addAssignment = useCallback((newAssignment: Assignment) => {
-    setAssignments((previous) => {
-      const existingIndex = previous.findIndex(
-        (assignment) =>
-          assignment.assigneeType === newAssignment.assigneeType &&
-          assignment.assigneeId === newAssignment.assigneeId,
+    setAssignments((prev) => {
+      const existingIndex = prev.findIndex(
+        (a) =>
+          a.assigneeId === newAssignment.assigneeId &&
+          a.assigneeType === newAssignment.assigneeType,
       );
-      if (existingIndex < 0) return [...previous, newAssignment];
 
-      return previous.map((assignment, index) =>
-        index === existingIndex
-          ? {
-              ...assignment,
-              assigneeName: newAssignment.assigneeName,
-              kpis: [...new Set([...assignment.kpis, ...newAssignment.kpis])],
-            }
-          : assignment,
-      );
+      if (existingIndex >= 0) {
+        // Merge KPIs
+        const updated = [...prev];
+        const existing = updated[existingIndex];
+        const mergedKPIs = Array.from(
+          new Set([...existing.kpis, ...newAssignment.kpis]),
+        );
+        updated[existingIndex] = { ...existing, kpis: mergedKPIs };
+        return updated;
+      }
+
+      return [...prev, newAssignment];
     });
   }, []);
 
-  const removeAssignment = useCallback((index: number) => {
-    setAssignments((prev) => prev.filter((_, i) => i !== index));
-    // Note: We deliberately don't clean up targets immediately to avoid complex sync logic,
-    // but in a production app we might want to clean up targets for removed assignees.
+  const removeAssignment = useCallback((assigneeId: string) => {
+    setAssignments((prev) =>
+      prev.filter((assignment) => assignment.assigneeId !== assigneeId),
+    );
+    // Task 2.2: Cleanly purge removed assignee's data from targets and basis maps
+    setTargets((prev) => {
+      let modified = false;
+      const next: Record<string, Record<string, number | null>> = {};
+      for (const [kpiId, assigneeMap] of Object.entries(prev)) {
+        if (assigneeMap && assigneeId in assigneeMap) {
+          modified = true;
+          const { [assigneeId]: _, ...rest } = assigneeMap;
+          next[kpiId] = rest;
+        } else {
+          next[kpiId] = assigneeMap;
+        }
+      }
+      return modified ? next : prev;
+    });
+    setDirectBasisAllocations((prev) => {
+      let modified = false;
+      const next: Record<string, Record<string, string>> = {};
+      for (const [kpiId, basisMap] of Object.entries(prev)) {
+        if (basisMap && assigneeId in basisMap) {
+          modified = true;
+          const { [assigneeId]: _, ...rest } = basisMap;
+          next[kpiId] = rest;
+        } else {
+          next[kpiId] = basisMap;
+        }
+      }
+      return modified ? next : prev;
+    });
   }, []);
 
   const clearAssignments = useCallback(() => {
@@ -240,16 +279,17 @@ export function AssignmentProvider({
   );
 
   const setBulkAssignmentValue = useCallback((kpiId: string, value: number) => {
-    setBulkAssignmentValues((prev) => ({ ...prev, [kpiId]: value }));
+    setBulkAssignmentValues((prev) => ({
+      ...prev,
+      [kpiId]: value,
+    }));
   }, []);
-
-  // Initialize defaults when objective changes or opens
-  // For now, we assume the provider is mounted fresh for each dialog open.
 
   const value = useMemo(
     () => ({
       sourceObjective: objective,
       availableKPIs: kpis,
+      existingAllocationsByKpiId: existingAllocations,
       searchTerm,
       setSearchTerm,
       assigneeType,
@@ -274,6 +314,7 @@ export function AssignmentProvider({
     [
       objective,
       kpis,
+      existingAllocations,
       searchTerm,
       assigneeType,
       selectedAssignees,

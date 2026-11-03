@@ -81,7 +81,7 @@ export function KPISelectionCard() {
                       </span>
                     )}
                     {kpi.calculationBasisSource === "DIRECT_VALUE" && (
-                      <span>Approved denominator allocation required</span>
+                      <span>Deliverables allocation required</span>
                     )}
                     {kpi.calculationBasisSource === "LINKED_KPI" && (
                       <span className="text-blue-700">

@@ -14,11 +14,8 @@ import {
 import type { Kpi } from "@/types/graphql";
 import { resolveAnnualKpiTarget } from "@/utils/quarterTargetAllocation";
 import {
-  calculateRequiredNumerator,
-  decimalValuesEqualTotal,
   formatBasisNumber,
   multiplyBasisByPercent,
-  splitBasisAmong,
 } from "@/utils/basisCalculation";
 
 // Helper to round numbers to max 2 decimal places
@@ -29,6 +26,7 @@ import { useAssignmentContext } from "@/context/AssignmentContext";
 export function TargetAssignmentCard() {
   const {
     availableKPIs: kpis,
+    existingAllocationsByKpiId,
     assignments,
     bulkAssignmentValues,
     setBulkAssignmentValue,
@@ -38,9 +36,7 @@ export function TargetAssignmentCard() {
     setDirectBasisAllocation,
   } = useAssignmentContext();
 
-
-
-  // Helper: Get total assigned target for a KPI
+  // Helper: Get total assigned target for a KPI in current staged assignments
   const getTotalAssignedTarget = (kpiId: string) => {
     let total = 0;
     assignments
@@ -110,32 +106,22 @@ export function TargetAssignmentCard() {
     return roundValue((fullTarget * cascadePercent) / 100);
   };
 
-  const handleAutoSplit = (kpiId: string, cascadeTarget: number) => {
+  const handleAutoSplit = (kpiId: string, targetToDistribute: number) => {
     const assigned = assignments.filter((assignment) =>
       assignment.kpis.includes(kpiId),
     );
     if (assigned.length === 0) return;
-    const splitValue = roundValue(cascadeTarget / assigned.length);
+    const splitValue = roundValue(targetToDistribute / assigned.length);
     assigned.forEach((assignment, index) => {
       if (index === assigned.length - 1) {
         // Last one gets the remainder to ensure exact sum matching
         const valueForLast = roundValue(
-          cascadeTarget - splitValue * (assigned.length - 1),
+          targetToDistribute - splitValue * (assigned.length - 1),
         );
         setTarget(kpiId, assignment.assigneeId, valueForLast);
       } else {
         setTarget(kpiId, assignment.assigneeId, splitValue);
       }
-    });
-  };
-
-  const handleAutoSplitBasis = (
-    kpiId: string,
-    cascadeBasis: string,
-    assigned: typeof assignments,
-  ) => {
-    splitBasisAmong(cascadeBasis, assigned.length).forEach((value, index) => {
-      setDirectBasisAllocation(kpiId, assigned[index].assigneeId, value);
     });
   };
 
@@ -164,7 +150,8 @@ export function TargetAssignmentCard() {
           const isDirectBasis = assignmentStrategy === "DIRECT_BASIS_RATE";
           const requiresRepeatedRate =
             assignmentStrategy === "REPEATED_RATE" ||
-            assignmentStrategy === "LINKED_BASIS_RATE";
+            assignmentStrategy === "LINKED_BASIS_RATE" ||
+            isDirectBasis;
           const isAdditive = assignmentStrategy === "ADDITIVE_SUM";
           const isScoreAverage = assignmentStrategy === "SCORE_AVERAGE";
           const usesChildSpecificTargets =
@@ -185,7 +172,6 @@ export function TargetAssignmentCard() {
               ? resolvedParentTarget
               : roundValue(resolvedParentTarget);
           const parentTarget = getCascadeTarget(kpi, fullParentTarget);
-          const totalAssigned = roundValue(getTotalAssignedTarget(kpiId));
           const unitLabel = getDetailedUnitLabel(kpi);
           const assignmentMethod =
             getTargetAssignmentDescription(assignmentStrategy);
@@ -210,9 +196,57 @@ export function TargetAssignmentCard() {
             (assignment) =>
               directBasisAllocations[kpiId]?.[assignment.assigneeId] || "",
           );
-          const basisReconciles =
-            isDirectBasis &&
-            decimalValuesEqualTotal(cascadeBasisString, assignedBasisValues);
+
+          // Over-Allocation Prevention: Resolve previous session allocations
+          const existing = existingAllocationsByKpiId[kpiId];
+          const stagedAssigneeIds = new Set(
+            kpiAssignments.map((a) => a.assigneeId),
+          );
+          const otherAllocations = (existing?.allocations || []).filter(
+            (a) => !stagedAssigneeIds.has(a.assigneeId),
+          );
+          const previouslyAllocatedTarget = roundValue(
+            otherAllocations.reduce((sum, a) => sum + a.targetValue, 0),
+          );
+          const previouslyAllocatedBasis = roundValue(
+            otherAllocations.reduce(
+              (sum, a) => sum + (Number(a.directBasisValue) || 0),
+              0,
+            ),
+          );
+
+          // Additive Quota Computations
+          const stagedTarget = roundValue(getTotalAssignedTarget(kpiId));
+          const totalOverallTarget = roundValue(
+            previouslyAllocatedTarget + stagedTarget,
+          );
+          const remainingTargetQuota = roundValue(
+            parentTarget - totalOverallTarget,
+          );
+          const isTargetOverAllocated = totalOverallTarget > parentTarget + 0.01;
+          const isTargetFullyAllocated =
+            Math.abs(totalOverallTarget - parentTarget) <= 0.01;
+
+          // Direct Basis Quota Computations
+          const basisUnitLabel =
+            kpi.basisUnitType && kpi.basisUnitType !== "NUMBER"
+              ? kpi.basisUnitType
+              : "deliverables";
+          const stagedBasis = roundValue(
+            assignedBasisValues.reduce(
+              (sum, value) => sum + (Number(value) || 0),
+              0,
+            ),
+          );
+          const totalOverallBasis = roundValue(
+            previouslyAllocatedBasis + stagedBasis,
+          );
+          const remainingBasisQuota = roundValue(
+            cascadeBasis - totalOverallBasis,
+          );
+          const isBasisOverAllocated = totalOverallBasis > cascadeBasis + 0.01;
+          const isBasisReconciles =
+            Math.abs(totalOverallBasis - cascadeBasis) <= 0.01;
 
           return (
             <div key={kpiId} className="space-y-3">
@@ -231,46 +265,68 @@ export function TargetAssignmentCard() {
                   {isHybrid && (
                     <p className="text-xs text-blue-600">
                       {isDirectBasis
-                        ? `${managerRetentionPercent}% of the basis stays with the manager; ${100 - managerRetentionPercent}% is allocated to the team.`
+                        ? `${managerRetentionPercent}% of deliverables stay with manager; ${100 - managerRetentionPercent}% allocated to team.`
                         : `Full target ${formatTarget(fullParentTarget)} ${unitLabel}: ${managerRetentionPercent}% manager / ${100 - managerRetentionPercent}% cascade`}
                     </p>
                   )}
                   {isDirectBasis && (
                     <div className="mt-1 flex flex-col items-end gap-1">
-                      <p className={basisReconciles ? "text-sm text-green-600" : "text-sm text-red-600"}>
-                        Approved denominator allocated: {formatBasisNumber(
-                          assignedBasisValues.reduce((sum, value) => sum + (Number(value) || 0), 0),
-                        )} / {formatBasisNumber(cascadeBasis)} {kpi.basisUnitType || ""}
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                        onClick={() => handleAutoSplitBasis(kpiId, cascadeBasisString, kpiAssignments)}
-                        className="text-xs"
+                      <p
+                        className={
+                          isBasisReconciles
+                            ? "text-sm text-green-600 font-medium"
+                            : isBasisOverAllocated
+                              ? "text-sm text-red-600 font-bold"
+                              : "text-sm text-amber-700 font-medium"
+                        }
                       >
-                        Auto-split approved denominator
-                      </Button>
+                        Deliverables allocated: {formatBasisNumber(totalOverallBasis)} / {formatBasisNumber(cascadeBasis)} {basisUnitLabel}
+                      </p>
+                      {previouslyAllocatedBasis > 0 && (
+                        <div className="text-xs text-slate-600 flex flex-wrap gap-1 justify-end">
+                          <span>Prev: <strong>{formatBasisNumber(previouslyAllocatedBasis)}</strong></span>
+                          <span>·</span>
+                          <span>Staged: <strong>{formatBasisNumber(stagedBasis)}</strong></span>
+                          <span>·</span>
+                          <span>Rem: <strong className={remainingBasisQuota < 0 ? "text-red-600 font-bold" : "text-green-700 font-bold"}>{formatBasisNumber(remainingBasisQuota)}</strong></span>
+                        </div>
+                      )}
                     </div>
                   )}
                   {isAdditive && (
                     <div className="flex flex-col items-end gap-1">
                       <p
                         className={`text-sm ${
-                          totalAssigned === parentTarget
-                            ? "text-green-600"
-                            : "text-red-600"
+                          isTargetFullyAllocated
+                            ? "text-green-600 font-medium"
+                            : isTargetOverAllocated
+                              ? "text-red-600 font-bold"
+                              : "text-amber-700 font-medium"
                         }`}
                       >
-                        Total Assigned: {formatTarget(totalAssigned)} {unitLabel}
+                        Total Allocated: {formatTarget(totalOverallTarget)} / {formatTarget(parentTarget)} {unitLabel}
                       </p>
+                      {previouslyAllocatedTarget > 0 && (
+                        <div className="text-xs text-slate-600 flex flex-wrap gap-1 justify-end">
+                          <span>Prev: <strong>{formatTarget(previouslyAllocatedTarget)}</strong></span>
+                          <span>·</span>
+                          <span>Staged: <strong>{formatTarget(stagedTarget)}</strong></span>
+                          <span>·</span>
+                          <span>Rem: <strong className={remainingTargetQuota < 0 ? "text-red-600 font-bold" : "text-green-700 font-bold"}>{formatTarget(remainingTargetQuota)}</strong></span>
+                        </div>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleAutoSplit(kpiId, parentTarget)}
+                        onClick={() =>
+                          handleAutoSplit(
+                            kpiId,
+                            Math.max(0, parentTarget - previouslyAllocatedTarget),
+                          )
+                        }
                         className="text-xs mt-1"
                       >
-                        Auto Split
+                        Auto Split Remaining
                       </Button>
                     </div>
                   )}
@@ -354,14 +410,15 @@ export function TargetAssignmentCard() {
                   return (
                     <div
                       key={`${kpiId}-${assignment.assigneeId}`}
-                      className="flex items-center gap-3 p-3 bg-white border border-blue-200 rounded-lg"
+                      className="flex items-center justify-between gap-4 p-3 bg-white border border-blue-200 rounded-lg"
                     >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{assigneeName}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{assigneeName}</p>
                       </div>
-                      {isDirectBasis ? (
-                        <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-3">
+                        {isDirectBasis && (
                           <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 font-medium">Deliverables:</span>
                             <FormattedNumberInput
                               step="any"
                               value={
@@ -377,27 +434,16 @@ export function TargetAssignmentCard() {
                                   value,
                                 )
                               }
-                              className="w-40 h-9"
-                              placeholder="Approved denominator allocation"
+                              className="w-24 h-9"
+                              placeholder="0"
                             />
                             <span className="text-sm text-gray-600">
-                              {kpi.basisUnitType || "basis"}
+                              {basisUnitLabel}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-500">
-                            Target {kpi.unitType === "RATIO" ? `${parentTarget}:1` : `${parentTarget}%`} · Required {kpi.numeratorLabel || "numerator"}: {formatBasisNumber(
-                              calculateRequiredNumerator(
-                                parentTarget,
-                                directBasisAllocations[kpiId]?.[
-                                  assignment.assigneeId
-                                ] || "",
-                                kpi.unitType,
-                              ),
-                            )}
-                          </p>
-                        </div>
-                      ) : (
+                        )}
                         <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 font-medium">Target:</span>
                           <FormattedNumberInput
                             step="any"
                             value={
@@ -412,14 +458,20 @@ export function TargetAssignmentCard() {
                                 normalized === "" ? null : Number(normalized),
                               );
                             }}
-                            className="w-32 h-9"
-                            placeholder={isCurrency ? "283,654,789" : "0"}
+                            className="w-24 h-9"
+                            placeholder={
+                              isDirectBasis || requiresRepeatedRate
+                                ? parentTarget.toString()
+                                : isCurrency
+                                  ? "283,654,789"
+                                  : "0"
+                            }
                           />
                           <span className="text-sm text-gray-600">
                             {unitLabel}
                           </span>
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
@@ -428,20 +480,24 @@ export function TargetAssignmentCard() {
               {isAdditive && (
                 <div
                   className={`flex items-center gap-2 p-2 rounded ${
-                    totalAssigned === parentTarget
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
+                    isTargetOverAllocated
+                      ? "bg-red-100 text-red-800 border border-red-300"
+                      : isTargetFullyAllocated
+                        ? "bg-green-100 text-green-800"
+                        : "bg-amber-50 text-amber-800 border border-amber-200"
                   }`}
                 >
-                  {totalAssigned === parentTarget ? (
-                    <CheckCircle className="w-4 h-4" />
+                  {isTargetFullyAllocated ? (
+                    <CheckCircle className="w-4 h-4 shrink-0 text-green-600" />
                   ) : (
-                    <AlertCircle className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                   )}
                   <span className="text-sm">
-                    {totalAssigned === parentTarget
-                      ? "Target allocation matches parent goal"
-                      : `Total assigned (${formatTarget(totalAssigned)}) must be exactly ${formatTarget(parentTarget)} ${unitLabel}`}
+                    {isTargetOverAllocated
+                      ? `Over-allocated by ${formatTarget(roundValue(totalOverallTarget - parentTarget))} ${unitLabel}! Total allocation across all sessions cannot exceed ${formatTarget(parentTarget)} ${unitLabel}.`
+                      : isTargetFullyAllocated
+                        ? `Target allocation matches parent goal (${formatTarget(parentTarget)} ${unitLabel}).`
+                        : `${formatTarget(remainingTargetQuota)} ${unitLabel} remaining to allocate to reach parent target of ${formatTarget(parentTarget)} ${unitLabel}.`}
                   </span>
                 </div>
               )}
@@ -449,25 +505,29 @@ export function TargetAssignmentCard() {
               {isDirectBasis && (
                 <div
                   className={`flex items-center gap-2 p-2 rounded ${
-                    basisReconciles
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
+                    isBasisOverAllocated
+                      ? "bg-red-100 text-red-800 border border-red-300"
+                      : isBasisReconciles
+                        ? "bg-green-100 text-green-800"
+                        : "bg-amber-50 text-amber-800 border border-amber-200"
                   }`}
                 >
-                  {basisReconciles ? (
-                    <CheckCircle className="w-4 h-4" />
+                  {isBasisReconciles ? (
+                    <CheckCircle className="w-4 h-4 shrink-0 text-green-600" />
                   ) : (
-                    <AlertCircle className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                   )}
                   <span className="text-sm">
-                    {basisReconciles
-                      ? "Approved denominator allocation matches the parent cascade denominator exactly."
-                      : `Approved denominator allocations must sum exactly to ${formatBasisNumber(cascadeBasis)} ${kpi.basisUnitType || ""}.`}
+                    {isBasisOverAllocated
+                      ? `Deliverables over-allocated by ${formatBasisNumber(roundValue(totalOverallBasis - cascadeBasis))} ${basisUnitLabel}! Total deliverables cannot exceed ${formatBasisNumber(cascadeBasis)} ${basisUnitLabel}.`
+                      : isBasisReconciles
+                        ? `Allocated deliverables match the team target of ${formatBasisNumber(cascadeBasis)} ${basisUnitLabel}.`
+                        : `${formatBasisNumber(remainingBasisQuota)} ${basisUnitLabel} remaining to allocate to reach team target of ${formatBasisNumber(cascadeBasis)} ${basisUnitLabel}.`}
                   </span>
                 </div>
               )}
 
-              {requiresRepeatedRate && (
+              {requiresRepeatedRate && !isDirectBasis && (
                 <div
                   className={`flex items-center gap-2 p-2 rounded ${
                     rateTargetsRepeat(kpiId, parentTarget)
