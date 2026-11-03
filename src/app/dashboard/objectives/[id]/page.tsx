@@ -660,7 +660,7 @@ export default function ObjectiveDetailPage() {
                             <dl className="mt-2 space-y-1 text-slate-600">
                               <div className="flex justify-between gap-2"><dt>Target</dt><dd>{formatNumber(plan?.effectiveTarget)}</dd></div>
                               <div className="flex justify-between gap-2"><dt>Actual</dt><dd>{formatNumber(result?.finalActual)}</dd></div>
-                              <div className="flex justify-between gap-2"><dt>Achievement</dt><dd>{formatNumber(result?.finalAchievementRate, "%")}</dd></div>
+                              <div className="flex justify-between gap-2"><dt>Achievement</dt><dd>{result?.finalAchievementRate == null ? "—" : formatNumber(Number(result.finalAchievementRate) * 100, "%")}</dd></div>
                               <div className="flex justify-between gap-2"><dt>Status</dt><dd>{result?.status ?? plan?.status?.replaceAll("_", " ") ?? "—"}</dd></div>
                               {result?.carryOut != null && (
                                 <div className="flex justify-between gap-2"><dt>Carry</dt><dd>{formatNumber(result.carryOut)}</dd></div>

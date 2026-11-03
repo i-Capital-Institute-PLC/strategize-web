@@ -110,6 +110,19 @@ export const GET_KPIS = gql`
           status
           version
         }
+        quarterResults {
+          kpiQuarterResultId
+          quarterPlanId
+          calculationMode
+          calculationStatus
+          finalActual
+          finalAchievementRate
+          rollupNumeratorExact
+          rollupDenominatorExact
+          status
+          calculatedAt
+          finalizedAt
+        }
         latestUpdate {
           kpiUpdateId
           achievedValue
@@ -325,6 +338,19 @@ export const GET_KPIS_BY_OBJECTIVE = gql`
           status
           version
         }
+        quarterResults {
+          kpiQuarterResultId
+          quarterPlanId
+          calculationMode
+          calculationStatus
+          finalActual
+          finalAchievementRate
+          rollupNumeratorExact
+          rollupDenominatorExact
+          status
+          calculatedAt
+          finalizedAt
+        }
       }
       meta {
         currentPage
@@ -419,6 +445,19 @@ export const GET_MY_KPIS = gql`
         directBasisTarget
           status
           version
+        }
+        quarterResults {
+          kpiQuarterResultId
+          quarterPlanId
+          calculationMode
+          calculationStatus
+          finalActual
+          finalAchievementRate
+          rollupNumeratorExact
+          rollupDenominatorExact
+          status
+          calculatedAt
+          finalizedAt
         }
         latestUpdate {
           kpiUpdateId

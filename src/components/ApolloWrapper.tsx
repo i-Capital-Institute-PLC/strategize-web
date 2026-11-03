@@ -8,7 +8,7 @@ import apolloClient from "@/lib/apollo-client";
 
 const CACHE_KEY = "strategize-apollo-cache-v2";
 const CACHE_VERSION_KEY = "strategize-cache-version";
-const CURRENT_CACHE_VERSION = "2.0"; // Increment this to invalidate old caches
+const CURRENT_CACHE_VERSION = "2.1"; // Increment this to invalidate old caches
 
 interface ApolloWrapperProps {
   children: ReactNode;

@@ -312,6 +312,7 @@ export default function KpiDetailPage() {
 
   const { data: kpiData, loading: kpiLoading, error: kpiError } = useQuery(GET_KPI, {
     variables: { kpiId },
+    fetchPolicy: "cache-and-network",
   });
   const kpi = kpiData?.kpi;
   const strategicPeriodId = kpi?.objective?.strategicPeriod?.strategicPeriodId;
@@ -850,7 +851,7 @@ export default function KpiDetailPage() {
                     <DetailItem label="Carry-in" value={formatValue(plan?.carryIn, unit.short)} />
                     <DetailItem label="Effective target" value={formatValue(plan?.effectiveTarget, unit.short)} />
                     <DetailItem label="Actual" value={formatValue(result?.finalActual, unit.short)} />
-                    <DetailItem label="Achievement" value={result?.finalAchievementRate == null ? "—" : `${formatNumber(result.finalAchievementRate)}%`} />
+                    <DetailItem label="Achievement" value={result?.finalAchievementRate == null ? "—" : `${formatNumber(Number(result.finalAchievementRate) * 100)}%`} />
                     <DetailItem label="Calculation" value={labelize(result?.calculationMode || kpi.calculationType)} />
                   </div>
                   {plan?.directBasisTarget != null && (

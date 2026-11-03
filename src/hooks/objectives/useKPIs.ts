@@ -17,7 +17,7 @@ export const useKPIs = (variables: KpisQueryVariables = {}) => {
       limit: 10,
       ...variables,
     },
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     notifyOnNetworkStatusChange: true,
     returnPartialData: true,
@@ -40,7 +40,7 @@ export const useKPI = (variables: KpiQueryVariables) => {
     KpiQueryVariables
   >(GET_KPI, {
     variables,
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     skip: !variables.kpiId,
     notifyOnNetworkStatusChange: true,

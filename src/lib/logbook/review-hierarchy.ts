@@ -34,10 +34,19 @@ export function canReviewLogbookOwner(
   const ownerRole = String(owner.role || "").toUpperCase();
 
   if (currentUserRole === 'CEO') {
-    return owner.managerId === currentUser.employeeId && (
-      ownerRole === 'DIRECTOR' || departments.some(
-        (department) => department.head?.employeeId === owner.employeeId,
-      )
+    return (
+      (owner.managerId === currentUser.employeeId && (
+        ownerRole === 'DIRECTOR' || departments.some(
+          (department) => department.head?.employeeId === owner.employeeId,
+        )
+      )) ||
+      (!owner.managerId && (
+        ownerRole === 'DIRECTOR' || departments.some(
+          (department) =>
+            department.head?.employeeId === owner.employeeId &&
+            !department.division,
+        )
+      ))
     );
   }
 
