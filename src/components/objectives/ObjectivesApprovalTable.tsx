@@ -67,7 +67,7 @@ function ObjectivesApprovalTableContent() {
   >(null);
   const [activeTab, setActiveTab] = useState<string>("corporate");
   const [selectedPersonnelEmployeeId, setSelectedPersonnelEmployeeId] =
-    useState<string>("all");
+    useState<string>("");
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "asc" | "desc";
@@ -104,10 +104,10 @@ function ObjectivesApprovalTableContent() {
   const isEmployee = !showTabs;
 
   useEffect(() => {
-    if (userEmployeeId && (isManager || isCoordinator)) {
+    if (userEmployeeId && (!selectedPersonnelEmployeeId || selectedPersonnelEmployeeId === "all")) {
       setSelectedPersonnelEmployeeId(userEmployeeId);
     }
-  }, [userEmployeeId, isManager, isCoordinator]);
+  }, [userEmployeeId, selectedPersonnelEmployeeId]);
 
   // Determine the assigneeId based on the user role and selected organizational unit
   const getAssigneeId = (): string | undefined => {
@@ -242,11 +242,21 @@ function ObjectivesApprovalTableContent() {
     skip: !showTabs,
   });
 
-  // Fetch Employees for names lookup - Only for admins (backend restricts this)
+  // Fetch Employees for names lookup - Scoped by backend for managers, directors, admins
   const { data: employeesData } = useQuery(GET_EMPLOYEES, {
     variables: { page: 1, limit: 1000 },
-    skip: !showTabs || !(guards.isAdmin || guards.isSuperAdmin), // Skip for non-admins
+    skip: !showTabs,
   });
+
+  // Allowed department employee IDs for manager personnel visibility
+  const departmentEmployeeIdSet = useMemo(() => {
+    const set = new Set<string>();
+    if (userEmployeeId) set.add(userEmployeeId);
+    employeesData?.employees?.items?.forEach((e: any) => {
+      if (e.employeeId) set.add(e.employeeId);
+    });
+    return set;
+  }, [employeesData, userEmployeeId]);
 
   // Build names lookup map
   const unitNames = useMemo(() => {
@@ -423,7 +433,12 @@ function ObjectivesApprovalTableContent() {
         selectedUnitId: selectedUnitId,
       });
 
-      const myDeptIds = managedDepartmentIds || [];
+      const myDeptIds = [
+        ...new Set([
+          ...(managedDepartmentIds || []),
+          ...(user?.departments?.map((d: any) => d.departmentId) || []),
+        ]),
+      ];
 
       filtered = filtered.filter((obj) => {
         // Show objectives explicitly assigned to manager's departments
@@ -452,16 +467,40 @@ function ObjectivesApprovalTableContent() {
           obj.assigneeType === "EMPLOYEE" ||
           obj.type === "PERSONNEL"
         ) {
-          const parentObj = objectives.find(
-            (o) => o.objectiveId === obj.parent?.objectiveId,
-          );
-          const match =
+          // Employee must belong to the manager's department or direct reports
+          const isDeptMember =
+            (obj.assigneeId && departmentEmployeeIdSet.has(obj.assigneeId)) ||
+            obj.assigneeId === userEmployeeId;
+
+          if (!isDeptMember) {
+            return false;
+          }
+
+          // Check parent objective in allObjectivesForLookup or objectives
+          const parentObj =
+            allObjectivesForLookup.find(
+              (o) => o.objectiveId === obj.parent?.objectiveId,
+            ) ||
+            objectives.find(
+              (o) => o.objectiveId === obj.parent?.objectiveId,
+            );
+
+          const parentMatchesDept =
             parentObj &&
             parentObj.assigneeType === "DEPARTMENT" &&
             myDeptIds.includes(parentObj.assigneeId || "");
+
+          const emp = employeesData?.employees?.items?.find(
+            (e: any) => e.employeeId === obj.assigneeId,
+          );
+          const empInDept = emp?.departments?.some((d: any) =>
+            myDeptIds.includes(d.departmentId),
+          );
+
+          const match = Boolean(parentMatchesDept || empInDept);
           if (match)
             console.log("✅ [ObjectivesFilter] PERSONNEL match", obj.title);
-          return Boolean(match);
+          return match;
         }
 
         // Managers do NOT manage divisions; division objectives are hidden
@@ -604,6 +643,9 @@ function ObjectivesApprovalTableContent() {
     selectedUnitId,
     selectedUnitType,
     departmentsData?.departments?.items,
+    departmentEmployeeIdSet,
+    allObjectivesForLookup,
+    employeesData?.employees?.items,
   ]);
 
   // Set default tab based on role once - MUST be after filteredObjectives is defined
@@ -773,32 +815,68 @@ function ObjectivesApprovalTableContent() {
 
   // List of unique assignees in personnel objectives
   const personnelAssignees = useMemo(() => {
+    // Lookup map of employeeId -> department name
+    const empDeptMap = new Map<string, string>();
+    employeesData?.employees?.items?.forEach((e: any) => {
+      const deptName = e.departments?.[0]?.name;
+      if (deptName) {
+        empDeptMap.set(e.employeeId, deptName);
+      }
+    });
+
     const map = new Map<string, string>();
     if (userEmployeeId) {
+      const myDept =
+        empDeptMap.get(userEmployeeId) ||
+        user?.departments?.[0]?.name;
+      const deptSuffix = myDept ? ` (${myDept})` : "";
       map.set(
         userEmployeeId,
-        user?.fullName ? `${user.fullName} (You)` : "My Personal Objectives",
+        user?.fullName
+          ? `${user.fullName} (You)${deptSuffix}`
+          : "My Personal Objectives",
       );
     }
     personnelObjectives.forEach((obj) => {
       if (obj.assigneeId && !map.has(obj.assigneeId)) {
-        map.set(
-          obj.assigneeId,
-          unitNames[obj.assigneeId] || `Employee (${obj.assigneeId.slice(0, 8)})`,
-        );
+        const empName = unitNames[obj.assigneeId];
+        const deptName = empDeptMap.get(obj.assigneeId);
+        const deptSuffix = deptName ? ` (${deptName})` : "";
+        const label = empName
+          ? `${empName}${deptSuffix}`
+          : `Employee (${obj.assigneeId.slice(0, 8)})${deptSuffix}`;
+        map.set(obj.assigneeId, label);
       }
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [personnelObjectives, userEmployeeId, user?.fullName, unitNames]);
+  }, [
+    personnelObjectives,
+    userEmployeeId,
+    user?.fullName,
+    user?.departments,
+    unitNames,
+    employeesData,
+  ]);
+
+  useEffect(() => {
+    if (!selectedPersonnelEmployeeId || selectedPersonnelEmployeeId === "all") {
+      if (userEmployeeId) {
+        setSelectedPersonnelEmployeeId(userEmployeeId);
+      } else if (personnelAssignees.length > 0) {
+        setSelectedPersonnelEmployeeId(personnelAssignees[0].id);
+      }
+    }
+  }, [userEmployeeId, selectedPersonnelEmployeeId, personnelAssignees]);
 
   const displayedPersonnelObjectives = useMemo(() => {
-    if (selectedPersonnelEmployeeId === "all") {
+    const targetId = selectedPersonnelEmployeeId || userEmployeeId || personnelAssignees[0]?.id;
+    if (!targetId || targetId === "all") {
       return personnelObjectives;
     }
     return personnelObjectives.filter(
-      (obj) => obj.assigneeId === selectedPersonnelEmployeeId,
+      (obj) => obj.assigneeId === targetId,
     );
-  }, [personnelObjectives, selectedPersonnelEmployeeId]);
+  }, [personnelObjectives, selectedPersonnelEmployeeId, userEmployeeId, personnelAssignees]);
 
   const currentTabObjectives = useMemo(() => {
     if (!showTabs) return sortedObjectives;
@@ -1135,25 +1213,15 @@ function ObjectivesApprovalTableContent() {
                       setCurrentPage(1);
                     }}
                   >
-                    <SelectTrigger className="w-[210px] h-9 text-xs bg-white dark:bg-card">
+                    <SelectTrigger className="w-[280px] h-9 text-xs bg-white dark:bg-card">
                       <SelectValue placeholder="Select assignee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {userEmployeeId && (
-                        <SelectItem value={userEmployeeId}>
-                          {user?.fullName ? `${user.fullName} (You)` : "My Personal Objectives"}
+                      {personnelAssignees.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
                         </SelectItem>
-                      )}
-                      <SelectItem value="all">
-                        All Team Members ({personnelObjectives.length})
-                      </SelectItem>
-                      {personnelAssignees
-                        .filter((a) => a.id !== userEmployeeId)
-                        .map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1297,19 +1365,19 @@ function ObjectivesApprovalTableContent() {
         }
         unitNames={unitNames}
         emptyTitle={
-          selectedPeriodId
+          activeTab === "personnel" &&
+          selectedPersonnelEmployeeId === userEmployeeId
+            ? `No personal objectives assigned in ${selectedPeriodLabel}.`
+            : selectedPeriodId
             ? `No objectives in ${selectedPeriodLabel}.`
-            : activeTab === "personnel" &&
-              selectedPersonnelEmployeeId === userEmployeeId
-            ? "No personal objectives assigned."
             : "No objectives found."
         }
         emptyDescription={
-          selectedPeriodId
+          activeTab === "personnel" &&
+          selectedPersonnelEmployeeId === userEmployeeId
+            ? "You do not have individual personal objectives assigned yet for this period. Your department objectives are available under the Department tab, or select a team member from the Assignee filter above to view their cascaded objectives."
+            : selectedPeriodId
             ? "Objectives are shown only for the exact period or quarter where they were created."
-            : activeTab === "personnel" &&
-              selectedPersonnelEmployeeId === userEmployeeId
-            ? "You do not have individual personal objectives assigned yet. Your department objectives are available under the Department tab, or select 'All Team Members' to view your team's cascaded objectives."
             : "Change your filters or add a new objective."
         }
         childQuartersByParentId={(function () {

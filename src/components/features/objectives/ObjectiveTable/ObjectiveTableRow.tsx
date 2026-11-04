@@ -98,7 +98,11 @@ const ObjectiveTableRow: React.FC<ObjectiveTableRowProps> = ({
         if (objective.type === "CORPORATE") return null;
         if (objective.parent) {
             const parent = allObjectives.find(o => o.objectiveId === objective.parent?.objectiveId);
-            if (parent) return `From: ${parent.type.charAt(0) + parent.type.slice(1).toLowerCase()}`;
+            if (parent) {
+                const parentUnit = parent.assigneeId ? unitNames[parent.assigneeId] : null;
+                const parentType = parent.type.charAt(0) + parent.type.slice(1).toLowerCase();
+                return parentUnit ? `From: ${parentUnit} (${parentType})` : `From: ${parentType}`;
+            }
         }
         return null;
     };
