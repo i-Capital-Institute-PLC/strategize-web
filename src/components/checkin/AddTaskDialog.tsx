@@ -467,6 +467,19 @@ export function AddTaskDialog({
       'optimize', 'debug', 'migrate', 'release', 'maintain',
       'upgrade', 'automate', 'prototype', 'architect', 'troubleshoot',
       'enhance', 'improve',
+      'code', 'program', 'script', 'scaffold', 'bootstrap',
+      'stub', 'mock', 'sandbox', 'modularize', 'decouple',
+      'encapsulate', 'benchmark', 'profile', 'instrument', 'fuzz',
+      'lint', 'audit', 'inspect', 'sanitize', 'trace',
+      'diagnose', 'reproduce', 'isolate', 'patch', 'hotfix',
+      'remediate', 'fix', 'commit', 'branch', 'merge',
+      'rebase', 'cherry-pick', 'sync', 'synchronize', 'stash',
+      'dockerize', 'containerize', 'provision', 'orchestrate', 'pipeline',
+      'publish', 'tag', 'seed', 'backfill', 'reconcile',
+      'persist', 'cache', 'flush', 'index', 'query',
+      'serialize', 'deserialize', 'normalize', 'denormalize', 'compile',
+      'transpile', 'bundle', 'minify', 'telemetry', 'log',
+      'throttle',
       // Investment
       'assess', 'appraise', 'underwrite', 'structure', 'negotiate',
       'forecast', 'model', 'allocate', 'screen', 'value',
@@ -883,7 +896,7 @@ export function AddTaskDialog({
                 )}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                💡 Start with an action verb: Prepare, Submit, Meet, Review, Complete, etc.
+                💡 Start with an action verb: Develop, Code, Refactor, Deploy, Review, Prepare, Test, etc.
               </p>
 
               {/* Mid-Week Task Checkbox */}

@@ -1,6 +1,6 @@
 import { useApolloClient, useMutation } from "@apollo/client";
-import { useState } from "react";
-import { Loader2, ChevronDown } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Loader2, ChevronDown, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import {
 import { useAuth } from "@/hooks/auth/useAuth";
 import { FINALIZE_KPI_QUARTER } from "@/lib/graphql/queries/kpi-scorecard";
 import type { KpiQuarterPlan, KpiQuarterResult } from "@/types/graphql";
+import { cn } from "@/lib/utils";
 
 interface QuarterPerformanceCellProps {
   kpiId: string;
@@ -99,6 +100,33 @@ export function QuarterPerformanceCell({
     }
   };
 
+  // Determine current active fiscal quarter and elapsed pace
+  const { activeQuarter, calendarElapsed } = useMemo(() => {
+    const now = new Date();
+    const m = now.getMonth();
+    // Fiscal quarters starting in July (6):
+    // Jul(6), Aug(7), Sep(8) -> Q1
+    // Oct(9), Nov(10), Dec(11) -> Q2
+    // Jan(0), Feb(1), Mar(2) -> Q3
+    // Apr(3), May(4), Jun(5) -> Q4
+    const qNum = m >= 6 ? Math.floor((m - 6) / 3) + 1 : Math.floor(m / 3) + 3;
+
+    let qStartMonth = 9;
+    if (qNum === 1) qStartMonth = 6;
+    else if (qNum === 2) qStartMonth = 9;
+    else if (qNum === 3) qStartMonth = 0;
+    else if (qNum === 4) qStartMonth = 3;
+
+    const qStartDate = new Date(now.getFullYear(), qStartMonth, 1);
+    const qEndDate = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+
+    const totalMs = qEndDate.getTime() - qStartDate.getTime();
+    const elapsedMs = now.getTime() - qStartDate.getTime();
+    const elapsed = Math.max(0.05, Math.min(1.0, elapsedMs / totalMs));
+
+    return { activeQuarter: qNum, calendarElapsed: elapsed };
+  }, []);
+
   if (plans.length === 0) {
     return <span className="text-xs text-muted-foreground">Annual only</span>;
   }
@@ -122,8 +150,24 @@ export function QuarterPerformanceCell({
               : null;
 
           // Effective target vs actual – compact summary
-          const effectiveTarget = plan ? Number(plan.effectiveTarget) : null;
+          const effectiveTarget = plan ? Number(plan.effectiveTarget ?? plan.originalTarget ?? 0) : null;
           const actual = hasResult ? Number(result!.finalActual) : null;
+
+          const isZeroTarget = plan != null && effectiveTarget === 0;
+
+          // Pacing check for current active quarter
+          const isActiveQuarter = quarter === activeQuarter;
+          let isAtRisk = false;
+          let pacingVariance = 0;
+
+          if (isActiveQuarter && !isZeroTarget && effectiveTarget && effectiveTarget > 0) {
+            const delivered = actual ?? 0;
+            const pace = delivered / effectiveTarget;
+            pacingVariance = pace - calendarElapsed;
+            if (pacingVariance <= -0.2) {
+              isAtRisk = true;
+            }
+          }
 
           const isFinalizing = loading && finalizingQuarter === quarter;
           const showFinalize =
@@ -137,37 +181,55 @@ export function QuarterPerformanceCell({
           // "In Progress" label for open quarters with no result yet
           const isOpenQuarter = plan && !hasResult;
 
+          // Unachieved check for closed/recorded quarters
+          const isUnachievedClosed = hasResult && achievementRate !== undefined && achievementRate < 0.75;
+
           // Tooltip breakdown content
           const breakdownContent = (
-            <div className="space-y-1 text-xs min-w-[160px]">
-              <div className="font-semibold text-foreground mb-1">
-                Q{quarter} Breakdown
+            <div className="space-y-1 text-xs min-w-[170px]">
+              <div className="font-semibold text-foreground mb-1 flex items-center justify-between">
+                <span>Q{quarter} Breakdown</span>
+                {isAtRisk && (
+                  <span className="text-[10px] text-red-600 font-bold bg-red-100 dark:bg-red-950 px-1 rounded">
+                    At-Risk
+                  </span>
+                )}
               </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Original target:</span>
-                <span>{plan ? Number(plan.originalTarget).toFixed(2) : "—"}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Carry in:</span>
-                <span
-                  className={
-                    Number(plan?.carryIn ?? 0) < 0
-                      ? "text-green-600"
-                      : Number(plan?.carryIn ?? 0) > 0
-                        ? "text-amber-600"
-                        : ""
-                  }
-                >
-                  {plan ? formatSigned(Number(plan.carryIn ?? 0)) : "—"}
-                </span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Effective target:</span>
-                <span className="font-medium">
-                  {plan ? Number(plan.effectiveTarget).toFixed(2) : "—"}
-                </span>
-              </div>
-              {hasResult && (
+
+              {isZeroTarget ? (
+                <div className="text-slate-400 py-1">
+                  There is no planned target this quarter (0.00 quota).
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Original target:</span>
+                    <span>{plan ? Number(plan.originalTarget).toFixed(2) : "—"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Carry in:</span>
+                    <span
+                      className={
+                        Number(plan?.carryIn ?? 0) < 0
+                          ? "text-green-600"
+                          : Number(plan?.carryIn ?? 0) > 0
+                            ? "text-amber-600"
+                            : ""
+                      }
+                    >
+                      {plan ? formatSigned(Number(plan.carryIn ?? 0)) : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Effective target:</span>
+                    <span className="font-medium">
+                      {plan ? Number(plan.effectiveTarget).toFixed(2) : "—"}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {hasResult && !isZeroTarget && (
                 <>
                   <div className="border-t my-1" />
                   <div className="flex justify-between gap-4">
@@ -180,21 +242,50 @@ export function QuarterPerformanceCell({
                       {achievementDisplay}
                     </span>
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Contribution:</span>
-                    <span className="text-primary">
-                      {Number(result!.weightedScore).toFixed(2)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">
-                      {result!.status === "FINAL"
-                        ? "Applied carry:"
-                        : "Projected carry:"}
-                    </span>
-                    <span>{formatSigned(Number(result!.carryOut))}</span>
-                  </div>
+                  {result!.weightedScore != null && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Contribution:</span>
+                      <span className="text-primary">
+                        {Number(result!.weightedScore).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {result!.carryOut != null && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">
+                        {result!.status === "FINAL"
+                          ? "Applied carry:"
+                          : "Projected carry:"}
+                      </span>
+                      <span>{formatSigned(Number(result!.carryOut))}</span>
+                    </div>
+                  )}
                 </>
+              )}
+
+              {/* Pacing Info for Active Quarter */}
+              {isActiveQuarter && !isZeroTarget && (
+                <div className="border-t pt-1 mt-1 space-y-0.5 text-[11px]">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Quarter Elapsed:</span>
+                    <span>{(calendarElapsed * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Pacing Variance:</span>
+                    <span
+                      className={
+                        pacingVariance >= 0
+                          ? "text-emerald-600 font-semibold"
+                          : pacingVariance <= -0.2
+                            ? "text-red-600 font-bold"
+                            : "text-amber-600"
+                      }
+                    >
+                      {pacingVariance >= 0 ? "+" : ""}
+                      {(pacingVariance * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -202,10 +293,24 @@ export function QuarterPerformanceCell({
           return (
             <Tooltip key={quarter}>
               <TooltipTrigger asChild>
-                <div className="rounded-md border bg-muted/30 p-2 text-xs cursor-default hover:bg-muted/60 transition-colors">
+                <div
+                  className={cn(
+                    "rounded-md border p-2 text-xs cursor-default transition-colors relative",
+                    isAtRisk
+                      ? "border-red-300 bg-red-50/40 dark:border-red-900/60 dark:bg-red-950/20 hover:bg-red-50/70"
+                      : isUnachievedClosed
+                        ? "border-amber-200 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10 hover:bg-amber-50/50"
+                        : "border-slate-200 dark:border-slate-800 bg-muted/30 hover:bg-muted/60",
+                  )}
+                >
                   {/* Quarter label + status badge */}
                   <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="font-semibold">Q{quarter}</span>
+                    <span className="font-semibold flex items-center gap-1">
+                      Q{quarter}
+                      {isActiveQuarter && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-600" title="Active Quarter" />
+                      )}
+                    </span>
                     <div className="flex items-center gap-0.5">
                       {getStatusBadge(displayStatus)}
                       <ChevronDown className="w-3 h-3 text-muted-foreground opacity-50" />
@@ -213,11 +318,22 @@ export function QuarterPerformanceCell({
                   </div>
 
                   {/* Compact: Target vs Actual */}
-                  {isOpenQuarter ? (
+                  {isZeroTarget ? (
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 italic mt-0.5 leading-tight">
+                      No planned target this quarter
+                    </div>
+                  ) : isOpenQuarter ? (
                     <div className="text-muted-foreground text-[10px] mt-0.5">
                       Target: {effectiveTarget?.toFixed(2) ?? "—"}
-                      <div className="mt-0.5 text-[10px] text-blue-500 font-medium">
-                        In Progress
+                      <div className="mt-0.5 flex items-center justify-between">
+                        <span className="text-[10px] text-blue-500 font-medium">
+                          In Progress
+                        </span>
+                        {isAtRisk && (
+                          <span className="text-[9px] font-bold text-red-600 bg-red-100 dark:bg-red-950 px-1 rounded animate-pulse">
+                            At-Risk
+                          </span>
+                        )}
                       </div>
                     </div>
                   ) : hasResult ? (
@@ -226,10 +342,22 @@ export function QuarterPerformanceCell({
                         {actual?.toFixed(2) ?? "—"} /{" "}
                         {effectiveTarget?.toFixed(2) ?? "—"}
                       </div>
-                      <div
-                        className={`mt-0.5 text-[11px] ${getAchievementClass(achievementRate)}`}
-                      >
-                        {achievementDisplay}
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span
+                          className={`text-[11px] ${getAchievementClass(achievementRate)}`}
+                        >
+                          {achievementDisplay}
+                        </span>
+                        {isAtRisk && (
+                          <span className="text-[9px] font-bold text-red-600 bg-red-100 dark:bg-red-950 px-1 rounded">
+                            At-Risk
+                          </span>
+                        )}
+                        {isUnachievedClosed && !isAtRisk && (
+                          <span className="text-[9px] text-amber-600 bg-amber-50 dark:bg-amber-950/60 px-1 rounded">
+                            Unachieved
+                          </span>
+                        )}
                       </div>
                     </>
                   ) : (

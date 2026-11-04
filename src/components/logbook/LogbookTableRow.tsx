@@ -69,6 +69,8 @@ export function LogbookTableRow({
   const canSubmit =
     !evidencePending &&
     (["DRAFT", "REJECTED"].includes(normalizedStatus) || !item.status);
+  const isLocked =
+    evidencePending || ["SUBMITTED", "APPROVED"].includes(normalizedStatus);
   const isBasisDriven =
     item.linkedKpi?.calculationBasisSource === "DIRECT_VALUE" ||
     item.linkedKpi?.calculationBasisSource === "LINKED_KPI";
@@ -122,7 +124,7 @@ export function LogbookTableRow({
         </td>
 
         {/* Date & Time */}
-        <td className="px-4 py-4">
+        <td className="px-4 py-4 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <div className="text-sm text-gray-900 dark:text-white">
             {format(new Date(item.entryDate), "MMM d, yyyy")}
           </div>
@@ -132,7 +134,7 @@ export function LogbookTableRow({
         </td>
 
         {/* Activity */}
-        <td className="px-4 py-4">
+        <td className="px-4 py-4 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <div className="space-y-1">
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               {item.activity}
@@ -152,14 +154,14 @@ export function LogbookTableRow({
         </td>
 
         {/* Description */}
-        <td className="px-4 py-4 max-w-xs">
+        <td className="px-4 py-4 max-w-xs cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
             {item.description || "-"}
           </p>
         </td>
 
         {/* Outcome */}
-        <td className="px-4 py-4 max-w-xs">
+        <td className="px-4 py-4 max-w-xs cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
           <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
             {item.outcome || "-"}
           </p>
@@ -185,23 +187,44 @@ export function LogbookTableRow({
 
         {/* Actions */}
         <td className="px-4 py-4">
-          <div className="flex items-center gap-2 [&_button]:min-h-9 [&_button]:touch-manipulation">
+          <div className="flex items-center gap-2 whitespace-nowrap [&_button]:min-h-9 [&_button]:touch-manipulation">
             {canSubmit && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => setIsSubmitDialogOpen(true)}
                 disabled={loading}
-                className="min-h-9 text-green-600 hover:text-green-700 hover:bg-green-50"
+                className="min-h-9 text-green-600 border-green-600 hover:bg-green-50"
               >
                 Submit
               </Button>
             )}
             <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEdit}
+              disabled={loading || isLocked}
+              className="min-h-9 text-[#3838EC] border-[#3838EC] hover:bg-[#ECECFF]"
+            >
+              <PencilIcon className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              disabled={loading || isLocked}
+              className="min-h-9 text-red-600 border-red-600 hover:bg-red-50"
+            >
+              <TrashIcon className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+            <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsExpanded(!isExpanded)}
               className="h-9 w-9 min-h-9 min-w-9 touch-manipulation text-gray-600 hover:text-gray-700"
+              title={isExpanded ? "Collapse" : "Expand"}
             >
               {isExpanded ? (
                 <ChevronUpIcon className="w-4 h-4" />
@@ -310,6 +333,41 @@ export function LogbookTableRow({
                     {format(new Date(item.updatedAt), "MMM d, yyyy h:mm a")}
                   </span>
                 </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700 [&_button]:min-h-9 [&_button]:touch-manipulation">
+                {canSubmit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsSubmitDialogOpen(true)}
+                    disabled={loading}
+                    className="min-h-9 text-green-600 border-green-600 hover:bg-green-50"
+                  >
+                    Submit
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEdit}
+                  disabled={loading || isLocked}
+                  className="min-h-9 text-[#3838EC] border-[#3838EC] hover:bg-[#ECECFF]"
+                >
+                  <PencilIcon className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={loading || isLocked}
+                  className="min-h-9 text-red-600 border-red-600 hover:bg-red-50"
+                >
+                  <TrashIcon className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
               </div>
             </div>
           </td>

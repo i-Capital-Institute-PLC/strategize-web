@@ -120,6 +120,8 @@ export interface LogbookFormulaForContextQueryVariables {
 export interface LogbookKpiOption {
   kpiId: string;
   name: string;
+  status?: string | null;
+  targetStatus?: string | null;
   targetValue?: number | null;
   unitType?: string | null;
   measurementUnit?: string | null;

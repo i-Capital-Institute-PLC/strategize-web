@@ -3,7 +3,7 @@
 import { Label } from "@/components/ui/label";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Target, TrendingUp } from "lucide-react";
+import { Target, TrendingUp, AlertTriangle } from "lucide-react";
 import { useMemo } from "react";
 
 interface DirectValueInputSectionProps {
@@ -38,7 +38,13 @@ export function DirectValueInputSection({
       percentage >= 75 ? "warning" : 
       "danger";
 
-    return { percentage, status, actual };
+    return {
+      percentage,
+      status,
+      actual,
+      isExceeded: actual > targetValue,
+      surplus: actual - targetValue,
+    };
   }, [value, targetValue]);
 
   const getStatusColor = (status: string) => {
@@ -109,7 +115,7 @@ export function DirectValueInputSection({
                   {achievementInfo.percentage.toFixed(1)}%
                 </span>
               </div>
-              
+
               {/* Progress Bar */}
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                 <div
@@ -123,17 +129,39 @@ export function DirectValueInputSection({
                   style={{ width: `${Math.min(achievementInfo.percentage, 100)}%` }}
                 />
               </div>
-              
-              <p className="text-xs text-muted-foreground text-center">
-                {achievementInfo.percentage >= 100
-                  ? "🎉 Target achieved!"
-                  : achievementInfo.percentage >= 75
-                  ? "Keep going! You're almost there."
-                  : "Continue working towards your target."}
+
+              <p className="text-xs text-center font-medium">
+                {achievementInfo.isExceeded ? (
+                  <span className="text-amber-700 dark:text-amber-400">
+                    ⚠️ Target Exceeded (+{achievementInfo.surplus.toFixed(2)} over quota)
+                  </span>
+                ) : achievementInfo.percentage === 100 ? (
+                  <span className="text-emerald-700 dark:text-emerald-400">
+                    🎉 Target achieved!
+                  </span>
+                ) : achievementInfo.percentage >= 75 ? (
+                  <span className="text-blue-700 dark:text-blue-400">
+                    Keep going! You're almost there.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Continue working towards your target.
+                  </span>
+                )}
               </p>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Warning when exceeded */}
+      {achievementInfo?.isExceeded && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-md flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-800 dark:text-amber-300">
+            <strong>Target exceeded:</strong> This entry exceeds your target quota by {achievementInfo.surplus.toFixed(2)}. Overachievements will be audited upon manager approval.
+          </p>
+        </div>
       )}
 
       {/* Helper Text */}

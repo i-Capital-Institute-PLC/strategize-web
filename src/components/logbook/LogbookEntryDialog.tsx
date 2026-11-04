@@ -4,6 +4,7 @@ import { getLogbookPeriodFields } from "./logbook-entry-period";
 import { FormulaConfigurationCard } from "./FormulaConfigurationCard";
 import { RatioFormulaInputSection } from "./RatioFormulaInputSection";
 import { DirectValueInputSection } from "./DirectValueInputSection";
+import { KpiLiveImpactCard } from "./KpiLiveImpactCard";
 import { normalizeMetricObservationValue } from "./metric-observation-value";
 
 import { useState, useEffect, useMemo } from "react";
@@ -138,10 +139,16 @@ export function LogbookEntryDialog({
     userId: currentUser?.employeeId,
     strategicPeriodId: selectedPeriod?.strategicPeriodId,
     purpose: "LOGBOOK",
+    status: "APPROVED",
   });
 
   // The API applies the same ownership and mode rules when listing and saving.
-  const availableKpis = assignedKpis;
+  // Filter to ensure only APPROVED KPIs are selectable in logbook
+  const availableKpis = useMemo(() => {
+    return assignedKpis.filter(
+      (kpi) => (kpi as any).status === "APPROVED" || (!(kpi as any).status && (!(kpi as any).targetStatus || (kpi as any).targetStatus === "APPROVED")),
+    );
+  }, [assignedKpis]);
 
   // Mutations
   const [createEntryMutation, { loading: creating }] = useMutation(
@@ -441,6 +448,130 @@ export function LogbookEntryDialog({
         return "";
     }
   };
+
+  // Resolve active fiscal quarter number
+  const currentQuarterNumber = useMemo(() => {
+    if (resultEntryContext?.quarterNumber) return resultEntryContext.quarterNumber;
+    const m = entryDate.getMonth();
+    return m >= 6 ? Math.floor((m - 6) / 3) + 1 : Math.floor(m / 3) + 3;
+  }, [resultEntryContext?.quarterNumber, entryDate]);
+
+  // Find quarter plan for active quarter
+  const activeQuarterPlan = useMemo(() => {
+    return (selectedKpi as any)?.quarterPlans?.find(
+      (q: any) => q.quarterNumber === currentQuarterNumber,
+    );
+  }, [selectedKpi, currentQuarterNumber]);
+
+  // Live Quarter Target
+  const liveQuarterTarget = useMemo(() => {
+    if (!selectedKpi) return 0;
+    if (activeQuarterPlan?.effectiveTarget != null) {
+      const val = Number(activeQuarterPlan.effectiveTarget);
+      if (!isNaN(val)) return val;
+    }
+    if (activeQuarterPlan?.directBasisTarget != null) {
+      const val = parseFloat(activeQuarterPlan.directBasisTarget);
+      if (!isNaN(val)) return val;
+    }
+    const timelineTarget = (selectedKpi as any)?.targets?.find((t: any) =>
+      t.timeline && (
+        t.timeline.toUpperCase().endsWith("-Q" + currentQuarterNumber) ||
+        t.timeline.toUpperCase().endsWith("Q" + currentQuarterNumber)
+      ),
+    );
+    if (timelineTarget?.target != null) {
+      const val = Number(timelineTarget.target);
+      if (!isNaN(val)) return val;
+    }
+    if (kpiTargetValue && !isNaN(parseFloat(kpiTargetValue))) {
+      return parseFloat(kpiTargetValue);
+    }
+    if (selectedKpi?.targetValue != null) {
+      return Number(selectedKpi.targetValue) / 4;
+    }
+    return 0;
+  }, [selectedKpi, activeQuarterPlan, currentQuarterNumber, kpiTargetValue]);
+
+  // Live Annual Target
+  const liveAnnualTarget = useMemo(() => {
+    if (!selectedKpi) return 0;
+    if (selectedKpi.targetValue != null && Number(selectedKpi.targetValue) > 0) {
+      return Number(selectedKpi.targetValue);
+    }
+    if (selectedKpi.quarterPlans && selectedKpi.quarterPlans.length > 0) {
+      const sum = selectedKpi.quarterPlans.reduce((acc: number, q: any) => {
+        return acc + (Number(q.effectiveTarget) || 0);
+      }, 0);
+      if (sum > 0) return sum;
+    }
+    return liveQuarterTarget * 4;
+  }, [selectedKpi, liveQuarterTarget]);
+
+  // Delivered prior to this entry for current quarter
+  const deliveredPriorQuarter = useMemo(() => {
+    if (!selectedKpi) return 0;
+    const qResult = (selectedKpi as any)?.quarterResults?.find(
+      (r: any) => r.quarterPlanId === activeQuarterPlan?.kpiQuarterPlanId,
+    );
+    if (qResult?.finalActual != null) {
+      const val = Number(qResult.finalActual);
+      if (!isNaN(val)) return val;
+    }
+    return 0;
+  }, [selectedKpi, activeQuarterPlan]);
+
+  // Delivered prior to this entry for annual
+  const deliveredPriorAnnual = useMemo(() => {
+    if (!selectedKpi) return 0;
+    if ((selectedKpi as any)?.quarterResults?.length) {
+      const sum = (selectedKpi as any).quarterResults.reduce(
+        (acc: number, r: any) => acc + (Number(r.finalActual) || 0),
+        0,
+      );
+      if (sum > 0) return sum;
+    }
+    if ((selectedKpi as any)?.latestUpdate?.achievedValue != null) {
+      const val = Number((selectedKpi as any).latestUpdate.achievedValue);
+      if (!isNaN(val)) return val;
+    }
+    return deliveredPriorQuarter;
+  }, [selectedKpi, deliveredPriorQuarter]);
+
+  // Live entered achieved value from any active input mode
+  const liveEnteredValue = useMemo(() => {
+    if (isFormulaKpi) {
+      if (formulaRatioPreview?.calculatedRate != null) {
+        return formulaRatioPreview.calculatedRate;
+      }
+    }
+    if (isBasisDrivenKpi) {
+      if (resultPreview.rateExact) {
+        const parsed = parseFloat(resultPreview.rateExact);
+        if (!isNaN(parsed)) return parsed;
+      }
+      if (kpiActualNumeratorExact) {
+        const parsed = parseFloat(kpiActualNumeratorExact);
+        if (!isNaN(parsed)) return parsed;
+      }
+    }
+    if (kpiAchievedValue) {
+      const parsed = parseFloat(kpiAchievedValue);
+      if (!isNaN(parsed)) return parsed;
+    }
+    if (kpiActualNumeratorExact) {
+      const parsed = parseFloat(kpiActualNumeratorExact);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  }, [
+    isFormulaKpi,
+    formulaRatioPreview,
+    isBasisDrivenKpi,
+    resultPreview,
+    kpiActualNumeratorExact,
+    kpiAchievedValue,
+  ]);
 
   const [dateOpen, setDateOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
@@ -923,6 +1054,21 @@ export function LogbookEntryDialog({
                   })}
                 </SelectContent>
               </Select>
+
+              {/* Live KPI Target, Remaining Quota & Impact Preview Card */}
+              {linkedKpiId && selectedKpi && (
+                <KpiLiveImpactCard
+                  kpiName={selectedKpi.name}
+                  quarterNumber={currentQuarterNumber}
+                  quarterTarget={liveQuarterTarget}
+                  annualTarget={liveAnnualTarget}
+                  deliveredPriorQuarter={deliveredPriorQuarter}
+                  deliveredPriorAnnual={deliveredPriorAnnual}
+                  enteredValue={liveEnteredValue}
+                  unitType={selectedKpi.unitType}
+                  measurementUnit={selectedKpi.measurementUnit}
+                />
+              )}
 
               {linkedKpiId && isFormulaKpi ? (
                 <div className="space-y-4 rounded-md border border-indigo-200 bg-indigo-50/50 p-4">

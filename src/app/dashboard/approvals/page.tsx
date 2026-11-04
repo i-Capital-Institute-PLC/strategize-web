@@ -217,9 +217,12 @@ export default function ApprovalsPage() {
   );
   const logbookEntries = useMemo(
     () =>
-      user?.role === 'CEO' ? rawLogbookEntries : rawLogbookEntries.filter((entry) =>
-        canReviewLogbookOwner(entry.owner, user, reviewDepartments),
-      ),
+      (user?.role === 'CEO'
+        ? rawLogbookEntries
+        : rawLogbookEntries.filter((entry) =>
+            canReviewLogbookOwner(entry.owner, user, reviewDepartments),
+          )
+      ).filter((entry) => entry.entryStatus !== "DRAFT"), // Managers must never see draft logbook entries
     [rawLogbookEntries, user, reviewDepartments],
   );
 
@@ -490,8 +493,7 @@ export default function ApprovalsPage() {
                       <SelectItem value="submitted">Pending</SelectItem>
                       <SelectItem value="approved">Approved</SelectItem>
                       <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                    </SelectContent>
+                      </SelectContent>
                   </Select>
                 </div>
 
