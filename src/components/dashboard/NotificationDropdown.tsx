@@ -17,8 +17,6 @@ import {
   UserCheck,
   Timer,
   Lock,
-  Mail,
-  MailCheck,
 } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import { GET_NOTIFICATIONS } from "@/lib/graphql/queries/notifications";
@@ -877,26 +875,6 @@ export default function NotificationDropdown() {
 
                   {/* Top-Right Micro Actions: Toggle Read / Unread & Dismiss */}
                   <div className="absolute top-3 right-3 flex items-center gap-1">
-                    {/* Toggle Read / Unread Button */}
-                    <button
-                      onClick={(e) =>
-                        toggleNotificationReadStatus(notification, e)
-                      }
-                      title={isUnread ? "Mark as read" : "Mark as unread"}
-                      className={cn(
-                        "p-1.5 rounded-md transition-colors",
-                        isUnread
-                          ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                          : "text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40",
-                      )}
-                    >
-                      {isUnread ? (
-                        <Check className="w-3.5 h-3.5" />
-                      ) : (
-                        <Mail className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-
                     {/* Dismiss Button */}
                     <button
                       onClick={(e) =>

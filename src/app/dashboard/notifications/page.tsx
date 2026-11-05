@@ -27,7 +27,6 @@ import {
   UserCheck,
   Timer,
   Lock,
-  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -749,26 +748,6 @@ export default function NotificationsPage() {
 
                 {/* Top-Right Micro Actions: Toggle Read / Unread & Dismiss */}
                 <div className="absolute top-4 right-4 flex items-center gap-1.5">
-                  {/* Toggle Read / Unread Button */}
-                  <button
-                    onClick={(e) =>
-                      toggleNotificationReadStatus(notification, e)
-                    }
-                    title={isUnread ? "Mark as read" : "Mark as unread"}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-colors",
-                      isUnread
-                        ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                        : "text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40",
-                    )}
-                  >
-                    {isUnread ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Mail className="w-4 h-4" />
-                    )}
-                  </button>
-
                   {/* Dismiss Button */}
                   <button
                     onClick={(e) =>
