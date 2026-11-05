@@ -9,6 +9,7 @@ import { GET_ME } from "@/lib/graphql/queries/auth";
 import { LogbookTable } from "@/components/logbook/LogbookTable";
 import { LogbookEntryDialog } from "@/components/logbook/LogbookEntryDialog";
 import { Button } from "@/components/ui/button";
+import SyncButton from "@/components/shared/SyncButton";
 import { PlusIcon, SearchIcon, FilterIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { FrontendLogbookItem } from "@/types/logbook";
@@ -75,6 +76,8 @@ function PersonalLogbookPage() {
       page: 1,
     },
     skip: !currentUser?.employeeId,
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
 
   // Map entries to frontend format
@@ -135,6 +138,10 @@ function PersonalLogbookPage() {
 
   const hasEntries = entries.length > 0;
 
+  const handleSyncLogbook = async () => {
+    await refetch();
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -147,17 +154,20 @@ function PersonalLogbookPage() {
             Track your fulfilled tasks and achievements
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => {
-            setEditingEntry(null);
-            setIsAddEntryOpen(true);
-          }}
-          className="gap-2"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Add entry
-        </Button>
+        <div className="flex items-center gap-2">
+          <SyncButton onSync={handleSyncLogbook} label="Sync" />
+          <Button
+            type="button"
+            onClick={() => {
+              setEditingEntry(null);
+              setIsAddEntryOpen(true);
+            }}
+            className="gap-2"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add entry
+          </Button>
+        </div>
       </div>
 
       {loading ? (

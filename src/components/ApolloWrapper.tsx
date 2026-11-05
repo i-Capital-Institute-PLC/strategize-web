@@ -8,7 +8,10 @@ import apolloClient from "@/lib/apollo-client";
 
 const CACHE_KEY = "strategize-apollo-cache-v2";
 const CACHE_VERSION_KEY = "strategize-cache-version";
-const CURRENT_CACHE_VERSION = "2.1"; // Increment this to invalidate old caches
+const CACHE_TIMESTAMP_KEY = "strategize-cache-timestamp";
+const CACHE_USER_ID_KEY = "strategize-cache-user-id";
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes TTL
+const CURRENT_CACHE_VERSION = "2.2"; // Increment this to invalidate old caches
 
 interface ApolloWrapperProps {
   children: ReactNode;
@@ -30,12 +33,51 @@ export function ApolloWrapper({ children }: ApolloWrapperProps) {
 
     const restore = async () => {
       try {
-        // Check cache version and purge if outdated
+        // Check cache version, TTL (30 mins), and user isolation
         const storedVersion = window.localStorage.getItem(CACHE_VERSION_KEY);
-        if (storedVersion !== CURRENT_CACHE_VERSION) {
-          console.log("Cache version mismatch, purging old cache");
+        const storedTimestamp = window.localStorage.getItem(CACHE_TIMESTAMP_KEY);
+        const storedUserId = window.localStorage.getItem(CACHE_USER_ID_KEY);
+
+        let currentUserId: string | null = null;
+        try {
+          const authData = window.sessionStorage.getItem("auth-storage");
+          if (authData) {
+            const parsed = JSON.parse(authData);
+            currentUserId = parsed?.state?.user?.employeeId ?? null;
+          }
+        } catch {
+          // ignore parsing error
+        }
+
+        const isExpired =
+          storedTimestamp && Date.now() - Number(storedTimestamp) > CACHE_TTL_MS;
+        const isUserMismatch = Boolean(
+          currentUserId && storedUserId && currentUserId !== storedUserId,
+        );
+        const isVersionMismatch = storedVersion !== CURRENT_CACHE_VERSION;
+
+        if (isVersionMismatch || isExpired || isUserMismatch) {
+          console.log(
+            isExpired
+              ? "Apollo cache TTL expired (30m), purging old cache"
+              : isUserMismatch
+                ? "Apollo cache user mismatch, purging previous user cache"
+                : "Apollo cache version mismatch, purging old cache",
+          );
           window.localStorage.removeItem(CACHE_KEY);
           window.localStorage.setItem(CACHE_VERSION_KEY, CURRENT_CACHE_VERSION);
+          window.localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+          if (currentUserId) {
+            window.localStorage.setItem(CACHE_USER_ID_KEY, currentUserId);
+          } else {
+            window.localStorage.removeItem(CACHE_USER_ID_KEY);
+          }
+        } else {
+          // Keep timestamp fresh for current active session
+          window.localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+          if (currentUserId && !storedUserId) {
+            window.localStorage.setItem(CACHE_USER_ID_KEY, currentUserId);
+          }
         }
 
         // Use IndexedDB with localStorage fallback
@@ -57,7 +99,10 @@ export function ApolloWrapper({ children }: ApolloWrapperProps) {
             try {
               await persistor?.purge();
               await apolloClient.clearStore();
+              window.localStorage.removeItem(CACHE_KEY);
               window.localStorage.removeItem(CACHE_VERSION_KEY);
+              window.localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+              window.localStorage.removeItem(CACHE_USER_ID_KEY);
               console.log("Apollo cache cleared successfully");
             } catch (error) {
               console.warn("Cache clear failed:", error);
@@ -70,6 +115,8 @@ export function ApolloWrapper({ children }: ApolloWrapperProps) {
         try {
           window.localStorage.removeItem(CACHE_KEY);
           window.localStorage.removeItem(CACHE_VERSION_KEY);
+          window.localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+          window.localStorage.removeItem(CACHE_USER_ID_KEY);
         } catch {
           // Ignore localStorage errors
         }

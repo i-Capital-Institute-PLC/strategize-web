@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
-import { gql, useQuery } from "@apollo/client";
+import { gql, useQuery, useApolloClient } from "@apollo/client";
+import { SyncButton } from "@/components/shared/SyncButton";
 import {
   GET_LOGBOOK_ENTRIES,
   GET_LOGBOOK_FORMULA_FOR_CONTEXT,
@@ -150,6 +151,25 @@ export default function ApprovalsPage() {
     useState<LogbookReviewEntry | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
 
+  const apolloClient = useApolloClient();
+
+  const handleSyncApprovals = async () => {
+    await Promise.allSettled([
+      refetchLogbook?.(),
+      apolloClient.refetchQueries({
+        include: [
+          "GetPendingSubmissions",
+          "GetKpiSubmissions",
+          "GetSubmissionsByStatus",
+          "GetPendingSubmissionsLight",
+          "GetLogbookEntries",
+          "GetLogbookPendingBadge",
+          "GetLogbookReviewDepartments",
+        ],
+      }),
+    ]);
+  };
+
   // Get logbook entries for approval
   // The server enforces the approver's hierarchy; UI checks are an additional safeguard.
   const { data: departmentsData, loading: departmentsLoading } = useQuery(
@@ -157,6 +177,8 @@ export default function ApprovalsPage() {
     {
       variables: { page: 1, limit: 1000 },
       skip: !user?.employeeId || user.role === 'CEO',
+      fetchPolicy: "cache-and-network",
+      nextFetchPolicy: "cache-first",
     },
   );
 
@@ -176,6 +198,8 @@ export default function ApprovalsPage() {
       page: user?.role === 'CEO' ? logbookPage : 1,
     },
     skip: !user?.employeeId,
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
 
   const selectedEntryIsFormula = isLogbookFormulaCalculationType(
@@ -328,10 +352,12 @@ export default function ApprovalsPage() {
                     ? "Approve Requests"
                     : "Approval Requests"}
               </h1>
-              {(guards.isAdmin || guards.isSuperAdmin) && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/dashboard/approvals/config")}
+              <div className="flex flex-wrap items-center gap-2">
+                <SyncButton onSync={handleSyncApprovals} label="Sync Approvals" />
+                {(guards.isAdmin || guards.isSuperAdmin) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push("/dashboard/approvals/config")}
                   className="w-full gap-2 sm:w-auto"
                 >
                   <svg
@@ -354,8 +380,9 @@ export default function ApprovalsPage() {
                     />
                   </svg>
                   Configure Workflow
-                </Button>
-              )}
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="text-gray-600">
               {isViewingOwnSubmissions

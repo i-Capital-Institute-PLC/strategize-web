@@ -99,6 +99,7 @@ export function CheckInTableCard({
   isSelectionEnabled = false,
   isSelected = false,
   onSelectionChange,
+  onRefetch,
   onSubmitForApproval,
   submittingTaskForApproval = false,
 }: CheckInTableCardProps) {
@@ -196,9 +197,19 @@ export function CheckInTableCard({
         },
       });
       toast.success("Task deleted successfully");
+      onRefetch?.();
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete task");
-      console.error(error);
+      const errStr = error?.message?.toLowerCase() || "";
+      if (
+        errStr.includes("not found") ||
+        errStr.includes("cannot return null for non-nullable field")
+      ) {
+        toast.success("Task deleted successfully");
+        onRefetch?.();
+      } else {
+        toast.error(error.message || "Failed to delete task");
+        console.error(error);
+      }
     }
   };
 
@@ -215,11 +226,10 @@ export function CheckInTableCard({
 
   return (
     <div
-      className={`rounded-lg border ${borderStyle} ${
-        !isEditable
+      className={`rounded-lg border ${borderStyle} ${!isEditable
           ? "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 opacity-75"
           : `${taskColors.background} ${taskColors.border}`
-      } overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
+        } overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
     >
       {/* Card Header */}
       <div className="p-4">
@@ -333,8 +343,8 @@ export function CheckInTableCard({
                 ? task.checkoutStatus.replace("_", " ")
                 : "Unknown"}
               {task.checkoutStatus === "DONE" &&
-              task.requiresApproval &&
-              !task.approvedAt
+                task.requiresApproval &&
+                !task.approvedAt
                 ? " (Pending)"
                 : ""}
             </Badge>

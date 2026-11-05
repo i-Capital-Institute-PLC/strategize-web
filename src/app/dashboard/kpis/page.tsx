@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useKpis } from "@/hooks/kpis/useKpis";
 import { KpisTable, CreateKpiDialog } from "@/components/kpis";
+import SyncButton from "@/components/shared/SyncButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,12 +24,16 @@ export default function KpisPage() {
   const user = useAuthStore((state) => state.user);
   const organizationId = user?.organizationId || "";
 
-  const { kpis, loading } = useKpis({
+  const { kpis, loading, refetch } = useKpis({
     page: 1,
     limit: 100,
     search: search || undefined,
     organizationId: organizationId || undefined,
   });
+
+  const handleSyncKpis = async () => {
+    await refetch();
+  };
 
   // Filter by type client-side (backend doesn't support type filter yet)
   const filteredKpis = typeFilter
@@ -54,9 +59,12 @@ export default function KpisPage() {
             </div>
           </div>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> New KPI
-        </Button>
+        <div className="flex items-center gap-2">
+          <SyncButton onSync={handleSyncKpis} label="Sync" />
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> New KPI
+          </Button>
+        </div>
       </div>
 
       {/* Stats row */}

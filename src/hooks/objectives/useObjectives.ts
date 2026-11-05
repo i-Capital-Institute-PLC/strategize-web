@@ -35,7 +35,7 @@ export const useObjectives = (variables: ObjectivesQueryVariables = {}) => {
   >(GET_OBJECTIVES, {
     variables: queryVariables,
     skip: !user?.employeeId,
-    fetchPolicy: personalOnly ? "cache-and-network" : "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     notifyOnNetworkStatusChange: true,
     // Keep showing cached rows while a background refresh runs.

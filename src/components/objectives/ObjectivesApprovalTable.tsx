@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import React from "react";
 import ObjectiveFilterBar from "./ObjectiveFilterBar";
+import SyncButton from "@/components/shared/SyncButton";
 import ObjectiveTable, {
   Objective,
 } from "@/components/features/objectives/ObjectiveTable";
@@ -198,6 +199,14 @@ function ObjectivesApprovalTableContent() {
     refetchAllObjectivesForLookup,
     refetchKpis,
   ]);
+
+  const handleSyncObjectives = async () => {
+    await Promise.allSettled([
+      refetch(),
+      refetchAllObjectivesForLookup(),
+      refetchKpis(),
+    ]);
+  };
 
   // Fetch KPI submissions specifically to get rejection reasons
   const { data: kpiSubmissionsData1 } = useQuery(GET_KPI_SUBMISSIONS, {
@@ -1231,8 +1240,9 @@ function ObjectivesApprovalTableContent() {
             <div className="flex-1" />
           )}
 
-          {/* Level Weight Progress Tracker */}
-          <div className="flex flex-col gap-1 min-w-[220px] px-2">
+          {/* Level Weight Progress Tracker and Sync */}
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1 min-w-[220px] px-2">
             <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider">
               <span
                 className={
@@ -1272,6 +1282,8 @@ function ObjectivesApprovalTableContent() {
                 {tabWeightInfo.note}
               </p>
             ) : null}
+            </div>
+            <SyncButton onSync={handleSyncObjectives} label="Sync" />
           </div>
         </div>
       </div>
