@@ -30,6 +30,7 @@ import { GET_KPI_FORMULA_DEFINITIONS } from "@/lib/graphql/queries/kpi-formulas"
 import { GET_EMPLOYEES_BY_ID } from "@/lib/graphql/queries/employees";
 import { GET_DEPARTMENTS_BY_ID } from "@/lib/graphql/queries/departments";
 import { GET_DIVISIONS_BY_ID } from "@/lib/graphql/queries/divisions";
+import { GET_ORGANIZATION } from "@/lib/graphql/queries/organizations";
 import {
   GET_KPI_FORMULA_ANNUAL_ACTUAL,
   GET_KPI_FORMULA_QUARTER_PLANS,
@@ -347,6 +348,10 @@ export default function KpiDetailPage() {
     variables: { employeeId: kpi?.assignerId || "" },
     skip: !kpi?.assignerId || kpi.assignerId === kpi.createdBy?.employeeId,
   });
+  const { data: orgData, loading: orgLoading } = useQuery(GET_ORGANIZATION, {
+    variables: { organizationId: organizationId || "" },
+    skip: !organizationId,
+  });
 
   const { data: updatesData } = useQuery(GET_KPI_UPDATES, {
     variables: { kpiId, page: 1, limit: 100 },
@@ -453,6 +458,11 @@ export default function KpiDetailPage() {
   const declaredAssigneeDisplay =
     directOwnerName ||
     (assigneeId ? (isAssigneeLoading ? "Loading…" : "Not recorded") : "Not directly assigned");
+
+  const organizationName =
+    orgData?.organization?.name ||
+    assignmentsData?.corporateAssignments?.items?.[0]?.organization?.name ||
+    (organizationId ? (orgLoading ? "Loading…" : "Not recorded") : "Not recorded");
 
   const assignments = useMemo(() => {
     const rows: AssignmentRow[] = [];
@@ -1114,8 +1124,8 @@ export default function KpiDetailPage() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Database className="h-5 w-5 text-slate-600" />Record metadata</CardTitle></CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
-              <DetailItem label="KPI ID" value={<span className="font-mono text-xs">{kpi.kpiId}</span>} />
-              <DetailItem label="Organization ID" value={<span className="font-mono text-xs">{kpi.organizationId}</span>} />
+              <DetailItem label="KPI" value={<span title={`KPI ID: ${kpi.kpiId}`}>{kpi.name}</span>} />
+              <DetailItem label="Organization" value={<span title={`Organization ID: ${kpi.organizationId}`}>{organizationName}</span>} />
               <DetailItem label="Created" value={formatDate(kpi.createdAt)} />
               <DetailItem label="Last updated" value={formatDate(kpi.updatedAt)} />
               <DetailItem label="Formula definitions" value={formulaDefinitions.length} />
