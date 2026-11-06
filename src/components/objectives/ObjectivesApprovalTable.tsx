@@ -152,15 +152,23 @@ function ObjectivesApprovalTableContent() {
     refetch,
   } = useObjectives(objectivesQueryVars);
 
-  // Fetch a broad set of objectives for lookup (to resolve parent KPI names in expanded rows)
-  // This avoids missing parent corporate objectives when the view is scoped to a unit
+  // When main objectives is not scoped by assigneeId or searchTerm, it already fetches all objectives.
+  // Avoid sending a duplicate identical 1000-row request on mount.
+  const needsSeparateLookup = Boolean((isEmployee && assigneeId) || searchTerm);
   const {
-    objectives: allObjectivesForLookup,
+    objectives: separateLookupObjectives,
     refetch: refetchAllObjectivesForLookup,
-  } = useObjectives({
-    page: 1,
-    limit: 1000,
-  });
+  } = useObjectives(
+    {
+      page: 1,
+      limit: 1000,
+    },
+    { skip: !needsSeparateLookup },
+  );
+
+  const allObjectivesForLookup = needsSeparateLookup
+    ? separateLookupObjectives
+    : objectives;
 
   // Fetch KPIs from API (large page so per-objective counts are correct)
   const {
@@ -189,7 +197,7 @@ function ObjectivesApprovalTableContent() {
     setCurrentPage(1);
 
     void refetch();
-    void refetchAllObjectivesForLookup();
+    if (needsSeparateLookup) void refetchAllObjectivesForLookup();
     void refetchKpis();
   }, [
     pathname,
@@ -198,14 +206,15 @@ function ObjectivesApprovalTableContent() {
     refetch,
     refetchAllObjectivesForLookup,
     refetchKpis,
+    needsSeparateLookup,
   ]);
 
   const handleSyncObjectives = async () => {
-    await Promise.allSettled([
-      refetch(),
-      refetchAllObjectivesForLookup(),
-      refetchKpis(),
-    ]);
+    const promises: Promise<any>[] = [refetch(), refetchKpis()];
+    if (needsSeparateLookup) {
+      promises.push(refetchAllObjectivesForLookup());
+    }
+    await Promise.allSettled(promises);
   };
 
   // Fetch KPI submissions specifically to get rejection reasons
@@ -921,6 +930,73 @@ function ObjectivesApprovalTableContent() {
     startIndex + itemsPerPage,
   );
 
+  const childQuartersByParentId = useMemo(() => {
+    try {
+      const map: Record<
+        string,
+        Record<
+          string,
+          { q1?: number; q2?: number; q3?: number; q4?: number }
+        >
+      > = {};
+
+      pagedObjectives.forEach((obj) => {
+        if (obj.type !== "CORPORATE") return;
+
+        const childObjectives = allObjectivesForLookup.filter(
+          (childObj) => childObj.parent?.objectiveId === obj.objectiveId,
+        );
+
+        const corporateKpis = kpis.filter(
+          (k) => k.objective?.objectiveId === obj.objectiveId,
+        );
+
+        corporateKpis.forEach((corporateKpi, kpiIndex) => {
+          const yearQuartersMap: Record<
+            string,
+            { q1?: number; q2?: number; q3?: number; q4?: number }
+          > = {};
+
+          childObjectives.forEach((childObj) => {
+            const childKpis = kpis.filter(
+              (k) => k.objective?.objectiveId === childObj.objectiveId,
+            );
+            const childKpi = childKpis[kpiIndex];
+
+            if (childKpi?.targets) {
+              childKpi.targets.forEach((target) => {
+                const parts = target.timeline.split("-");
+                if (parts.length === 2) {
+                  const [year, quarter] = parts;
+                  if (quarter.startsWith("Q")) {
+                    if (!yearQuartersMap[year]) {
+                      yearQuartersMap[year] = {};
+                    }
+                    const quarterNum = quarter.toLowerCase() as
+                      | "q1"
+                      | "q2"
+                      | "q3"
+                      | "q4";
+                    yearQuartersMap[year][quarterNum] =
+                      (yearQuartersMap[year][quarterNum] || 0) +
+                      Number(target.target || 0);
+                  }
+                }
+              });
+            }
+          });
+
+          map[corporateKpi.kpiId] = yearQuartersMap;
+        });
+      });
+
+      return map;
+    } catch (error) {
+      console.error("Error building childQuartersByParentId:", error);
+      return {};
+    }
+  }, [pagedObjectives, allObjectivesForLookup, kpis]);
+
   const handleSelect = (id: string) => {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id],
@@ -1392,75 +1468,7 @@ function ObjectivesApprovalTableContent() {
             ? "Objectives are shown only for the exact period or quarter where they were created."
             : "Change your filters or add a new objective."
         }
-        childQuartersByParentId={(function () {
-          try {
-            // Build child quarters map for corporate objectives
-            const map: Record<
-              string,
-              Record<
-                string,
-                { q1?: number; q2?: number; q3?: number; q4?: number }
-              >
-            > = {};
-
-            // For each corporate objective in the current page
-            pagedObjectives.forEach((obj) => {
-              if (obj.type !== "CORPORATE") return;
-
-              // Find all child objectives that inherit from this corporate objective
-              const childObjectives = allObjectivesForLookup.filter(
-                (childObj) => childObj.parent?.objectiveId === obj.objectiveId,
-              );
-
-              // Get corporate KPIs for this objective
-              const corporateKpis = kpis.filter(
-                (k) => k.objective?.objectiveId === obj.objectiveId,
-              );
-
-              // For each corporate KPI, collect quarters from all child KPIs
-              corporateKpis.forEach((corporateKpi, kpiIndex) => {
-                const yearQuartersMap: Record<
-                  string,
-                  { q1?: number; q2?: number; q3?: number; q4?: number }
-                > = {};
-
-                // Collect quarterly data from all child objectives for this KPI index
-                childObjectives.forEach((childObj) => {
-                  const childKpis = kpis.filter(
-                    (k) => k.objective?.objectiveId === childObj.objectiveId,
-                  );
-                  const childKpi = childKpis[kpiIndex]; // Match by index
-
-                  if (childKpi?.targets) {
-                    childKpi.targets.forEach((target) => {
-                      const parts = target.timeline.split("-");
-                      if (parts.length === 2) {
-                        const [year, quarter] = parts;
-                        if (quarter.startsWith("Q")) {
-                          if (!yearQuartersMap[year]) {
-                            yearQuartersMap[year] = {};
-                          }
-                          const quarterNum = quarter.toLowerCase() as
-                            "q1" | "q2" | "q3" | "q4";
-                          yearQuartersMap[year][quarterNum] =
-                            (yearQuartersMap[year][quarterNum] || 0) +
-                            Number(target.target || 0);
-                        }
-                      }
-                    });
-                  }
-                });
-
-                map[corporateKpi.kpiId] = yearQuartersMap;
-              });
-            });
-
-            return map;
-          } catch (error) {
-            console.error("Error building childQuartersByParentId:", error);
-            return {};
-          }
-        })()}
+        childQuartersByParentId={childQuartersByParentId}
       />
 
       {/* Pagination */}
