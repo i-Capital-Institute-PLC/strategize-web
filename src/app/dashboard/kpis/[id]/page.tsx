@@ -348,7 +348,7 @@ export default function KpiDetailPage() {
     variables: { employeeId: kpi?.assignerId || "" },
     skip: !kpi?.assignerId || kpi.assignerId === kpi.createdBy?.employeeId,
   });
-  const { data: orgData, loading: orgLoading } = useQuery(GET_ORGANIZATION, {
+  const { data: orgData, loading: orgLoading, error: orgError } = useQuery(GET_ORGANIZATION, {
     variables: { organizationId: organizationId || "" },
     skip: !organizationId,
   });

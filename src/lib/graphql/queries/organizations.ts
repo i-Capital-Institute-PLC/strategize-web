@@ -5,7 +5,7 @@ export const GET_ORGANIZATION = gql`
     organization(organizationId: $organizationId) {
       organizationId
       name
-      description
+      shortName
     }
   }
 `;
@@ -16,7 +16,7 @@ export const GET_ORGANIZATIONS = gql`
       items {
         organizationId
         name
-        description
+        shortName
       }
       meta {
         totalItems
@@ -26,3 +26,4 @@ export const GET_ORGANIZATIONS = gql`
     }
   }
 `;
+
