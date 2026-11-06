@@ -34,19 +34,19 @@ export default function AssignObjectiveDialog({
   kpis,
   onSuccess,
 }: AssignObjectiveDialogProps) {
-  // If dialog is not open, don't render content to avoid unnecessary mounts/fetches
-  if (!open) return null;
+  const organizationId = (objective as any)?.organizationId;
 
   const { data: allKpisData } = useQuery(GET_KPIS, {
     variables: {
-      organizationId: (objective as any).organizationId,
+      organizationId,
       limit: 1000,
     },
-    skip: !(objective as any)?.organizationId,
+    skip: !open || !organizationId,
     fetchPolicy: "network-only",
   });
 
   const existingAllocations = useMemo(() => {
+    if (!open || !kpis) return {};
     const map: Record<string, ExistingKpiAllocations> = {};
     const items = allKpisData?.kpis?.items || [];
     for (const kpi of kpis) {
@@ -70,7 +70,10 @@ export default function AssignObjectiveDialog({
       };
     }
     return map;
-  }, [allKpisData, kpis]);
+  }, [allKpisData, kpis, open]);
+
+  // If dialog is not open, don't render content to avoid unnecessary mounts
+  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

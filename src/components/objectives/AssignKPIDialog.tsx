@@ -45,33 +45,25 @@ export default function AssignKPIDialog({
         ? contributionType
         : "SUPPORT";
 
-    // If dialog is not open, don't render content
-    if (!open) return null;
-
     // We need the objective because children are created under it
-    const objective = kpi.objective as Objective;
-
-    if (!objective) {
-        console.error("KPI has no associated objective for assignment", kpi);
-        return null;
-    }
-
-    const isTopLevelCorporate = objective.type === "CORPORATE" && !objective.parent;
+    const objective = kpi?.objective as Objective | undefined;
+    const organizationId = (objective as any)?.organizationId;
 
     const { data: allKpisData } = useQuery(GET_KPIS, {
         variables: {
-            organizationId: (objective as any).organizationId,
+            organizationId,
             limit: 1000,
         },
-        skip: !(objective as any)?.organizationId,
+        skip: !open || !organizationId,
         fetchPolicy: "network-only",
     });
 
     const existingAllocations = useMemo(() => {
+        if (!open || !kpi) return {};
         const map: Record<string, ExistingKpiAllocations> = {};
         const items = allKpisData?.kpis?.items || [];
         const children = items.filter(
-            (item: any) => item.parent?.kpiId === kpi.kpiId && !item.isDeleted,
+            (item: any) => item.parent?.kpiId === kpi?.kpiId && !item.isDeleted,
         );
         const allocations: ExistingAllocation[] = children.map((c: any) => ({
             assigneeId: c.assigneeId,
@@ -89,7 +81,17 @@ export default function AssignKPIDialog({
             allocations,
         };
         return map;
-    }, [allKpisData, kpi]);
+    }, [allKpisData, kpi, open]);
+
+    // If dialog is not open, don't render content
+    if (!open) return null;
+
+    if (!objective) {
+        console.error("KPI has no associated objective for assignment", kpi);
+        return null;
+    }
+
+    const isTopLevelCorporate = objective.type === "CORPORATE" && !objective.parent;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
