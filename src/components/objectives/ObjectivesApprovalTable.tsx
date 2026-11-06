@@ -13,7 +13,6 @@ import DataTablePagination from "@/components/shared/DataTablePagination";
 import { useObjectives } from "@/hooks/objectives/useObjectives";
 import type { ObjectivesQueryVariables } from "@/types/graphql";
 import { useObjectiveMutations } from "@/hooks/objectives/useObjectiveMutations";
-import { useKPIs } from "@/hooks/objectives/useKPIs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuthStore, useOrgUnitStore } from "@/stores";
@@ -170,15 +169,29 @@ function ObjectivesApprovalTableContent() {
     ? separateLookupObjectives
     : objectives;
 
-  // Fetch KPIs from API (large page so per-objective counts are correct)
-  const {
-    kpis,
-    loading: kpisLoading,
-    refetch: refetchKpis,
-  } = useKPIs({
-    page: 1,
-    limit: 1000,
-  });
+  // Derive KPIs directly from loaded objectives (which already embed all KPI data + quarter plans).
+  // This eliminates the separate heavy 1000-KPI query on mount that was causing the long spinner delay.
+  const kpis = useMemo(() => {
+    const list: any[] = [];
+    const seen = new Set<string>();
+    for (const obj of allObjectivesForLookup) {
+      for (const k of obj.kpis || []) {
+        if (!seen.has(k.kpiId)) {
+          seen.add(k.kpiId);
+          list.push((k as any).objective ? k : { ...k, objective: obj });
+        }
+      }
+    }
+    return list;
+  }, [allObjectivesForLookup]);
+
+  const kpisLoading = false;
+  const refetchKpis = async () => {
+    await refetch();
+    if (needsSeparateLookup) {
+      await refetchAllObjectivesForLookup();
+    }
+  };
 
   // Only refetch when the strategic period actually changes — not on every
   // navigation back to this page (Apollo cache already holds the list).
@@ -964,7 +977,7 @@ function ObjectivesApprovalTableContent() {
             const childKpi = childKpis[kpiIndex];
 
             if (childKpi?.targets) {
-              childKpi.targets.forEach((target) => {
+              childKpi.targets.forEach((target: any) => {
                 const parts = target.timeline.split("-");
                 if (parts.length === 2) {
                   const [year, quarter] = parts;
