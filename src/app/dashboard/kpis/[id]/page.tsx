@@ -325,10 +325,14 @@ export default function KpiDetailPage() {
   const kpi = kpiData?.kpi;
   const strategicPeriodId = kpi?.objective?.strategicPeriod?.strategicPeriodId;
   const organizationId = kpi?.organizationId;
-  const assigneeType = kpi?.assigneeType?.toUpperCase() as
+  const rawAssigneeType = kpi?.assigneeType || kpi?.objective?.assigneeType || kpi?.objective?.type;
+  const assigneeType = rawAssigneeType?.toUpperCase() as
     | DirectAssigneeType
     | undefined;
-  const assigneeId = kpi?.assigneeId;
+  const assigneeId = kpi?.assigneeId || kpi?.objective?.assigneeId;
+  const assignerId =
+    kpi?.assignerId ||
+    kpi?.objective?.createdBy?.employeeId;
   const hasEmployeeOwner =
     assigneeType === "PERSONNEL" || assigneeType === "EMPLOYEE";
 
@@ -345,8 +349,8 @@ export default function KpiDetailPage() {
     skip: assigneeType !== "DIVISION" || !assigneeId,
   });
   const { data: assignerData, loading: assignerLoading } = useQuery(GET_EMPLOYEES_BY_ID, {
-    variables: { employeeId: kpi?.assignerId || "" },
-    skip: !kpi?.assignerId || kpi.assignerId === kpi.createdBy?.employeeId,
+    variables: { employeeId: assignerId || "" },
+    skip: !assignerId || assignerId === kpi?.createdBy?.employeeId || assignerId === kpi?.objective?.createdBy?.employeeId,
   });
   const { data: orgData, loading: orgLoading, error: orgError } = useQuery(GET_ORGANIZATION, {
     variables: { organizationId: organizationId || "" },
@@ -413,13 +417,15 @@ export default function KpiDetailPage() {
   );
   const annualFormulaActual = annualFormulaData?.kpiFormulaAnnualActual;
   const assignerEmployee =
-    kpi?.assignerId && kpi.assignerId === kpi.createdBy?.employeeId
+    assignerId && assignerId === kpi?.createdBy?.employeeId
       ? kpi.createdBy
-      : assignerData?.employee;
+      : (assignerId && kpi?.objective?.createdBy?.employeeId && assignerId === kpi.objective.createdBy.employeeId
+          ? kpi.objective.createdBy
+          : assignerData?.employee);
 
   const assignerDisplayName = assignerEmployee
     ? `${assignerEmployee.fullName}${assignerEmployee.title ? ` · ${assignerEmployee.title}` : ""}`
-    : kpi?.assignerId
+    : assignerId
       ? (assignerLoading ? "Loading…" : "Not recorded")
       : "Not recorded";
 
@@ -558,16 +564,15 @@ export default function KpiDetailPage() {
           source: "Direct owner",
           icon: directOwnerConfig.icon,
           name: directOwnerName || "Assigned organizational unit",
-          detail: "Ownership is stored directly on this KPI",
+          detail: kpi.assigneeId
+            ? "Ownership is stored directly on this KPI"
+            : "Inherited from objective",
           targetValue: kpi.targetValue,
           weight: kpi.weight,
           parentWeightAllocation: null,
           cap: null,
           createdAt: kpi.createdAt,
-          assignedBy:
-            kpi.assignerId && kpi.assignerId === kpi.createdBy?.employeeId
-              ? kpi.createdBy
-              : assignerEmployee || null,
+          assignedBy: assignerEmployee || null,
           strategicPeriod: kpi.objective?.strategicPeriod,
         });
       }
@@ -804,7 +809,7 @@ export default function KpiDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <DetailItem label="Declared assignee type" value={labelize(kpi.assigneeType)} />
+            <DetailItem label="Declared assignee type" value={labelize(assigneeType)} />
             <DetailItem label="Declared assignee" value={declaredAssigneeDisplay} />
             <DetailItem label="Assigned by" value={assignerDisplayName} />
             <DetailItem

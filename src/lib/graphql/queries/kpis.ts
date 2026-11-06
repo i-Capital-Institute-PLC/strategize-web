@@ -209,6 +209,12 @@ export const GET_KPI = gql`
         cascadeType
         assigneeType
         assigneeId
+        createdBy {
+          employeeId
+          fullName
+          email
+          title
+        }
         parent {
           objectiveId
         }
