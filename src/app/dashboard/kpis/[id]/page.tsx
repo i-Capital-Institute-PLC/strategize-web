@@ -331,17 +331,21 @@ export default function KpiDetailPage() {
   const hasEmployeeOwner =
     assigneeType === "PERSONNEL" || assigneeType === "EMPLOYEE";
 
-  const { data: employeeOwnerData } = useQuery(GET_EMPLOYEES_BY_ID, {
+  const { data: employeeOwnerData, loading: employeeOwnerLoading } = useQuery(GET_EMPLOYEES_BY_ID, {
     variables: { employeeId: assigneeId || "" },
     skip: !hasEmployeeOwner || !assigneeId,
   });
-  const { data: departmentOwnerData } = useQuery(GET_DEPARTMENTS_BY_ID, {
+  const { data: departmentOwnerData, loading: departmentOwnerLoading } = useQuery(GET_DEPARTMENTS_BY_ID, {
     variables: { departmentId: assigneeId || "" },
     skip: assigneeType !== "DEPARTMENT" || !assigneeId,
   });
-  const { data: divisionOwnerData } = useQuery(GET_DIVISIONS_BY_ID, {
+  const { data: divisionOwnerData, loading: divisionOwnerLoading } = useQuery(GET_DIVISIONS_BY_ID, {
     variables: { divisionId: assigneeId || "" },
     skip: assigneeType !== "DIVISION" || !assigneeId,
+  });
+  const { data: assignerData, loading: assignerLoading } = useQuery(GET_EMPLOYEES_BY_ID, {
+    variables: { employeeId: kpi?.assignerId || "" },
+    skip: !kpi?.assignerId || kpi.assignerId === kpi.createdBy?.employeeId,
   });
 
   const { data: updatesData } = useQuery(GET_KPI_UPDATES, {
@@ -403,11 +407,52 @@ export default function KpiDetailPage() {
     [formulaQuarterData],
   );
   const annualFormulaActual = annualFormulaData?.kpiFormulaAnnualActual;
+  const assignerEmployee =
+    kpi?.assignerId && kpi.assignerId === kpi.createdBy?.employeeId
+      ? kpi.createdBy
+      : assignerData?.employee;
+
+  const assignerDisplayName = assignerEmployee
+    ? `${assignerEmployee.fullName}${assignerEmployee.title ? ` · ${assignerEmployee.title}` : ""}`
+    : kpi?.assignerId
+      ? (assignerLoading ? "Loading…" : "Not recorded")
+      : "Not recorded";
+
+  const fallbackAssigneeName = useMemo(() => {
+    if (!assigneeId) return null;
+    const dep = assignmentsData?.departmentAssignments?.items?.find(
+      (d: any) => d.department?.departmentId === assigneeId,
+    );
+    if (dep?.department?.name) return dep.department.name;
+
+    const div = assignmentsData?.divisionAssignments?.items?.find(
+      (d: any) => d.division?.divisionId === assigneeId,
+    );
+    if (div?.division?.name) return div.division.name;
+
+    const emp = assignmentsData?.employeeAssignments?.items?.find(
+      (e: any) => e.employee?.employeeId === assigneeId,
+    );
+    if (emp?.employee?.fullName) return emp.employee.fullName;
+
+    return null;
+  }, [assigneeId, assignmentsData]);
+
+  const isAssigneeLoading =
+    (hasEmployeeOwner && employeeOwnerLoading) ||
+    (assigneeType === "DEPARTMENT" && departmentOwnerLoading) ||
+    (assigneeType === "DIVISION" && divisionOwnerLoading);
+
   const directOwnerName =
     employeeOwnerData?.employee?.fullName ||
     departmentOwnerData?.department?.name ||
     divisionOwnerData?.division?.name ||
+    fallbackAssigneeName ||
     (assigneeType === "CORPORATE" ? "Organization" : null);
+
+  const declaredAssigneeDisplay =
+    directOwnerName ||
+    (assigneeId ? (isAssigneeLoading ? "Loading…" : "Not recorded") : "Not directly assigned");
 
   const assignments = useMemo(() => {
     const rows: AssignmentRow[] = [];
@@ -512,7 +557,7 @@ export default function KpiDetailPage() {
           assignedBy:
             kpi.assignerId && kpi.assignerId === kpi.createdBy?.employeeId
               ? kpi.createdBy
-              : null,
+              : assignerEmployee || null,
           strategicPeriod: kpi.objective?.strategicPeriod,
         });
       }
@@ -526,6 +571,7 @@ export default function KpiDetailPage() {
     directOwnerName,
     hasEmployeeOwner,
     kpi,
+    assignerEmployee,
   ]);
 
   const quarters = useMemo(
@@ -749,9 +795,8 @@ export default function KpiDetailPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             <DetailItem label="Declared assignee type" value={labelize(kpi.assigneeType)} />
-            <DetailItem label="Direct owner" value={declaredOwner || "Not directly assigned"} />
-            <DetailItem label="Declared assignee ID" value={kpi.assigneeId ? <span className="font-mono text-xs">{kpi.assigneeId}</span> : "Not recorded"} />
-            <DetailItem label="Assigner ID" value={kpi.assignerId || "Not recorded"} />
+            <DetailItem label="Declared assignee" value={declaredAssigneeDisplay} />
+            <DetailItem label="Assigned by" value={assignerDisplayName} />
             <DetailItem
               label="Created by"
               value={
