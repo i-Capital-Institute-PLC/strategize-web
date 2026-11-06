@@ -417,14 +417,14 @@ export default function NotificationDropdown() {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
-          className="relative p-2.5 rounded-full bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none"
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/90 bg-white shadow-2xs transition-all hover:bg-slate-100 dark:border-white/[0.12] dark:bg-zinc-800/90 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           title="Notifications"
         >
-          <Bell className="w-5 h-5 text-gray-700 dark:text-gray-200" />
+          <Bell className="h-5 w-5 text-slate-700 dark:text-zinc-200" />
           {bellBadgeCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 flex items-center justify-center">
               <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-red-400 opacity-40"></span>
-              <span className="relative inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+              <span className="relative inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none shadow-xs">
                 {bellBadgeCount > 99 ? "99+" : bellBadgeCount}
               </span>
             </span>

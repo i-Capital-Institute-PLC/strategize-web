@@ -118,7 +118,9 @@ export function KpiAggregationSelector({
               }
             }}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="min-h-[44px] h-auto py-2 text-left">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem
                 value="SUM"
@@ -130,22 +132,36 @@ export function KpiAggregationSelector({
                     calculationType,
                   })
                 }
+                className="py-2"
               >
-                Sum child values
+                <div className="flex flex-col gap-0.5 text-left">
+                  <span className="font-semibold text-xs sm:text-sm">Sum child values</span>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400">Direct arithmetic sum of child achievements</span>
+                </div>
               </SelectItem>
               <SelectItem
                 value="SIMPLE_AVERAGE"
                 disabled={!scoreAverageAllowed}
+                className="py-2"
               >
-                Score average
+                <div className="flex flex-col gap-0.5 text-left">
+                  <span className="font-semibold text-xs sm:text-sm">Score average</span>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400">Equal weight given to each child score</span>
+                </div>
               </SelectItem>
               <SelectItem
                 value="DENOMINATOR_WEIGHTED_AVERAGE"
                 disabled={!percentageCompatible}
+                className="py-2"
               >
-                {unitType === "RATIO"
-                  ? "Ratio components: sum numerator ÷ sum denominator"
-                  : "Percentage components: sum numerator ÷ sum denominator"}
+                <div className="flex flex-col gap-0.5 text-left">
+                  <span className="font-semibold text-xs sm:text-sm">
+                    {unitType === "RATIO" ? "Ratio components" : "Percentage components"}
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500 dark:text-zinc-400">
+                    ∑ Numerator ÷ ∑ Denominator
+                  </span>
+                </div>
               </SelectItem>
             </SelectContent>
           </Select>
