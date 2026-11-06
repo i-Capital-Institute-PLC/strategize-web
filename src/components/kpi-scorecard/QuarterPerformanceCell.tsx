@@ -211,13 +211,26 @@ export function QuarterPerformanceCell({
                     <span
                       className={
                         Number(plan?.carryIn ?? 0) < 0
-                          ? "text-green-600"
+                          ? "text-emerald-600 font-semibold"
                           : Number(plan?.carryIn ?? 0) > 0
-                            ? "text-amber-600"
+                            ? "text-amber-600 font-semibold"
                             : ""
                       }
+                      title={
+                        Number(plan?.carryIn ?? 0) < 0
+                          ? "Surplus credit applied: reduced effective target"
+                          : Number(plan?.carryIn ?? 0) > 0
+                            ? "Deficit carry: increased effective target"
+                            : undefined
+                      }
                     >
-                      {plan ? formatSigned(Number(plan.carryIn ?? 0)) : "—"}
+                      {plan
+                        ? Number(plan.carryIn ?? 0) < 0
+                          ? `${formatSigned(Number(plan.carryIn ?? 0))} (surplus credit)`
+                          : Number(plan.carryIn ?? 0) > 0
+                            ? `${formatSigned(Number(plan.carryIn ?? 0))} (deficit)`
+                            : "0.00"
+                        : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between gap-4">
@@ -257,7 +270,28 @@ export function QuarterPerformanceCell({
                           ? "Applied carry:"
                           : "Projected carry:"}
                       </span>
-                      <span>{formatSigned(Number(result!.carryOut))}</span>
+                      <span
+                        className={
+                          Number(result!.carryOut) < 0
+                            ? "text-emerald-600 font-semibold"
+                            : Number(result!.carryOut) > 0
+                              ? "text-amber-600 font-semibold"
+                              : ""
+                        }
+                        title={
+                          Number(result!.carryOut) < 0
+                            ? "Overachievement surplus: carried forward to reduce next quarter's target (not a penalty)"
+                            : Number(result!.carryOut) > 0
+                              ? "Target deficit: carried forward to next quarter"
+                              : undefined
+                        }
+                      >
+                        {Number(result!.carryOut) < 0
+                          ? `${formatSigned(Number(result!.carryOut))} (surplus credit)`
+                          : Number(result!.carryOut) > 0
+                            ? `${formatSigned(Number(result!.carryOut))} (deficit)`
+                            : "0.00"}
+                      </span>
                     </div>
                   )}
                 </>
@@ -391,7 +425,11 @@ export function QuarterPerformanceCell({
                           <AlertDialogDescription>
                             This locks the quarter result and{" "}
                             {quarter < 4
-                              ? `applies its ${formatSigned(Number(result!.carryOut))} balance to Q${quarter + 1}`
+                              ? Number(result!.carryOut ?? 0) < 0
+                                ? `applies a ${Math.abs(Number(result!.carryOut)).toFixed(2)} surplus credit to decrease Q${quarter + 1}'s target`
+                                : Number(result!.carryOut ?? 0) > 0
+                                  ? `transfers a ${Number(result!.carryOut).toFixed(2)} deficit to Q${quarter + 1}`
+                                  : `applies zero balance to Q${quarter + 1}`
                               : "records the final annual balance"}
                             . Finalized quarters cannot accept new logbook
                             achievements.

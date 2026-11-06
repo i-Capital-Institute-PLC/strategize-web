@@ -683,7 +683,7 @@ export default function QuarterlyPerformanceReport() {
                         className="rounded-full text-[10px] font-semibold"
                       >
                         {quarter.rowCount > 0 && quarter.notDueCount === quarter.rowCount
-                          ? "Not due"
+                          ? "Not due this quarter"
                           : `${quarter.finalCount}/${quarter.rowCount - (quarter.notDueCount ?? 0)} final`}
                       </Badge>
                     </div>
@@ -710,7 +710,7 @@ export default function QuarterlyPerformanceReport() {
                           Result coverage
                         </span>
                         <span className="font-semibold tabular-nums text-slate-600 dark:text-zinc-300">
-                          {formatPercent(quarter.resultCoverageRate)}
+                          {`${formatPercent(quarter.resultCoverageRate)} · ${quarter.pendingResultCount ?? 0} pending${Boolean(quarter.notDueCount) ? ` · ${quarter.notDueCount} not due` : ""}`}
                         </span>
                       </div>
                     </div>
@@ -847,7 +847,7 @@ export default function QuarterlyPerformanceReport() {
                   {loading && <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />}
                 </h3>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
-                  Targets and carry values are shown per KPI. Click any record row for full mathematical formula audit.
+                  Targets and carry values are shown per KPI (overachievement surplus credits reduce next quarter target). Click any record row for full mathematical formula audit.
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -1246,7 +1246,18 @@ function QuarterDetailDialog({
             label="Original quarter target"
             value={formatMetric(row.originalTarget, row)}
           />
-          <DetailCard label="Carry in" value={formatSigned(row.carryIn)} />
+          <DetailCard
+            label="Carry in"
+            value={
+              row.carryIn == null
+                ? "—"
+                : Number(row.carryIn) < 0
+                  ? `${formatSigned(row.carryIn)} (surplus credit)`
+                  : Number(row.carryIn) > 0
+                    ? `${formatSigned(row.carryIn)} (deficit)`
+                    : formatSigned(row.carryIn)
+            }
+          />
           <DetailCard
             label="Effective target"
             value={formatMetric(row.effectiveTarget, row)}
@@ -1277,7 +1288,15 @@ function QuarterDetailDialog({
                 ? "Applied carry out"
                 : "Projected carry out"
             }
-            value={row.carryOut == null ? "—" : formatSigned(row.carryOut)}
+            value={
+              row.carryOut == null
+                ? "—"
+                : Number(row.carryOut) < 0
+                  ? `${formatSigned(row.carryOut)} (surplus credit)`
+                  : Number(row.carryOut) > 0
+                    ? `${formatSigned(row.carryOut)} (deficit)`
+                    : "0"
+            }
           />
           <DetailCard
             label="Result status"
@@ -1454,7 +1473,13 @@ function ComponentBreakdown({
         <div className="flex justify-between text-slate-500 dark:text-zinc-400">
           <span>Carry:</span>
           <span className={`font-semibold tabular-nums ${carryClass(carry)}`}>
-            {carry == null ? "—" : formatSigned(carry)}
+            {carry == null
+              ? "—"
+              : Number(carry) < 0
+                ? `${formatSigned(carry)} (surplus)`
+                : Number(carry) > 0
+                  ? `${formatSigned(carry)} (deficit)`
+                  : "0"}
           </span>
         </div>
       </div>
