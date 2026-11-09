@@ -461,6 +461,14 @@ export interface LogbookApprovalAchievementEntry {
   kpiActualBasisExact?: string | null;
   evidenceUrl?: string | null;
   evidenceItems?: LogbookEvidence[] | null;
+  evidenceApprovalRequired?: boolean | null;
+  evidenceApprovalStatus?: string | null;
+  evidenceApproverId?: string | null;
+  evidenceApprover?: {
+    employeeId?: string | null;
+    fullName?: string | null;
+    title?: string | null;
+  } | null;
   metricObservations?: LogbookMetricObservation[] | null;
   linkedKpi?: {
     kpiId?: string | null;

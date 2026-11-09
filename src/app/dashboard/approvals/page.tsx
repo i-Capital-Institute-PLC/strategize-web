@@ -103,6 +103,14 @@ type LogbookReviewEntry = {
   evidenceDescription?: string | null;
   evidenceUrl?: string | null;
   evidenceItems?: LogbookEvidence[] | null;
+  evidenceApprovalRequired?: boolean | null;
+  evidenceApprovalStatus?: string | null;
+  evidenceApproverId?: string | null;
+  evidenceApprover?: {
+    employeeId?: string | null;
+    fullName?: string | null;
+    title?: string | null;
+  } | null;
   decisionsMade?: string | null;
   lessonsLearned?: string | null;
   risksIssues?: string | null;
@@ -941,67 +949,94 @@ export default function ApprovalsPage() {
                 </div>
               )}
 
-              {Boolean(selectedLogbookEntry.evidenceItems?.length) && (
+              {/* Evidence of Performance */}
+              {selectedLogbookEntry.evidenceApprovalStatus?.toUpperCase() ===
+              "APPROVED" ? (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                     <FileText className="w-4 h-4" />
                     Evidence of Performance
                   </Label>
-                  <div className="space-y-2 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-                    {selectedLogbookEntry.evidenceItems?.map(
-                      (evidence, index) => (
-                        <div
-                          key={`${evidence.type}-${evidence.value}-${index}`}
-                          className="rounded-md border bg-white p-3 dark:bg-gray-950"
-                        >
-                          <p className="text-xs font-semibold text-gray-500">
-                            {evidence.type.replaceAll("_", " ")}
-                          </p>
-                          {evidence.type === "EMAIL" ? (
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
-                              {evidence.value}
-                            </p>
-                          ) : (
-                            <AttachmentTrigger
-                              url={evidence.value}
-                              name={evidence.name || evidence.value}
-                              mimeType={evidence.mimeType}
-                              evidenceType={evidence.type}
-                              variant="link"
-                              className="mt-1"
-                            />
-                          )}
-                          {evidence.mimeType && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {evidence.mimeType}
-                              {evidence.size != null
-                                ? ` · ${(evidence.size / 1024).toFixed(1)} KB`
-                                : ""}
-                            </p>
-                          )}
-                        </div>
-                      ),
-                    )}
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                        Evidence Verified & Approved
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                      Performance evidence was verified and approved by{" "}
+                      {selectedLogbookEntry.evidenceApprover?.fullName ||
+                        "the designated Evidence Approver"}
+                      .
+                    </p>
                   </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  {Boolean(selectedLogbookEntry.evidenceItems?.length) && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Evidence of Performance
+                      </Label>
+                      <div className="space-y-2 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+                        {selectedLogbookEntry.evidenceItems?.map(
+                          (evidence, index) => (
+                            <div
+                              key={`${evidence.type}-${evidence.value}-${index}`}
+                              className="rounded-md border bg-white p-3 dark:bg-gray-950"
+                            >
+                              <p className="text-xs font-semibold text-gray-500">
+                                {evidence.type.replaceAll("_", " ")}
+                              </p>
+                              {evidence.type === "EMAIL" ? (
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
+                                  {evidence.value}
+                                </p>
+                              ) : (
+                                <AttachmentTrigger
+                                  url={evidence.value}
+                                  name={evidence.name || evidence.value}
+                                  mimeType={evidence.mimeType}
+                                  evidenceType={evidence.type}
+                                  variant="link"
+                                  className="mt-1"
+                                />
+                              )}
+                              {evidence.mimeType && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                  {evidence.mimeType}
+                                  {evidence.size != null
+                                    ? ` · ${(evidence.size / 1024).toFixed(1)} KB`
+                                    : ""}
+                                </p>
+                              )}
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Legacy Evidence URL */}
-              {selectedLogbookEntry.evidenceUrl &&
-                !selectedLogbookEntry.evidenceItems?.length && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <LinkIcon className="w-4 h-4" />
-                    Evidence Link
-                  </Label>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                    <AttachmentTrigger
-                      url={selectedLogbookEntry.evidenceUrl}
-                      name={selectedLogbookEntry.evidenceUrl}
-                      variant="link"
-                    />
-                  </div>
-                </div>
+                  {/* Legacy Evidence URL */}
+                  {selectedLogbookEntry.evidenceUrl &&
+                    !selectedLogbookEntry.evidenceItems?.length && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                          <LinkIcon className="w-4 h-4" />
+                          Evidence Link
+                        </Label>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                          <AttachmentTrigger
+                            url={selectedLogbookEntry.evidenceUrl}
+                            name={selectedLogbookEntry.evidenceUrl}
+                            variant="link"
+                          />
+                        </div>
+                      </div>
+                    )}
+                </>
               )}
 
               {/* Decisions Made / Remark */}

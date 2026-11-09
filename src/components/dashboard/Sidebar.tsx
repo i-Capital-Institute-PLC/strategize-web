@@ -798,7 +798,7 @@ function CollapsibleCategory({
       if (!can(link.permission)) return false;
       if (link.managerOnly && !isManagerRole) return false;
       if (link.rolesOnly && !link.rolesOnly.includes(userRole || "")) return false;
-      if (link.evidenceApproverOnly && !isEvidenceApprover) return false;
+      if (link.evidenceApproverOnly && !isEvidenceApprover && userRole !== "CEO") return false;
       return true;
     })
     .map((link) =>
@@ -925,9 +925,11 @@ export default function Sidebar({
     GET_MY_EVIDENCE_APPROVER_AUTHORIZATION,
     { skip: !userRole, fetchPolicy: "cache-and-network" },
   );
-  const isEvidenceApprover = Boolean(
-    evidenceAuthorizationData?.myEvidenceApproverAuthorization?.isActive,
-  );
+  const isEvidenceApprover =
+    userRole === "CEO" ||
+    Boolean(
+      evidenceAuthorizationData?.myEvidenceApproverAuthorization?.isActive,
+    );
   const { data: evidenceInboxData } = useQuery(GET_EVIDENCE_APPROVAL_INBOX, {
     variables: { page: 1, limit: 1, status: "PENDING" },
     skip: !isEvidenceApprover,

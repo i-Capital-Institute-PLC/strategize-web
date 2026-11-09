@@ -892,23 +892,41 @@ export function LogbookEntryDialog({
       <DialogContent className="max-w-2xl p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
           <DialogTitle className="text-xl font-semibold">
-            {editingEntry ? "Edit Logbook Entry" : "Add Logbook Entry"}
+            {editingEntry ? "Revise Rejected Logbook Entry" : "Add Logbook Entry"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] px-6 py-6">
           <div className="space-y-5">
+            {/* Rejection notice for rejected entries */}
+            {editingEntry?.rejectionReason && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+                <p className="text-xs font-semibold text-red-800 dark:text-red-300">
+                  Rejection Reason from Approver:
+                </p>
+                <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                  {editingEntry.rejectionReason}
+                </p>
+                <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  Task metadata (Date, Activity, and Linked KPI) is locked. You can only update your achievement value, outcome notes, and revised evidence below.
+                </p>
+              </div>
+            )}
             {/* Entry Date & Time */}
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Entry Date & Time <span className="text-red-500">*</span>
               </Label>
               <div className="flex gap-2">
-                <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <Popover open={Boolean(editingEntry) ? false : dateOpen} onOpenChange={(o) => !editingEntry && setDateOpen(o)}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="flex-1 h-10 justify-start text-sm font-normal"
+                      disabled={Boolean(editingEntry)}
+                      className={cn(
+                        "flex-1 h-10 justify-start text-sm font-normal",
+                        editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                      )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4 text-gray-500 shrink-0" />
                       <span className="truncate">
@@ -937,11 +955,15 @@ export function LogbookEntryDialog({
                   </PopoverContent>
                 </Popover>
 
-                <Popover open={timeOpen} onOpenChange={setTimeOpen}>
+                <Popover open={Boolean(editingEntry) ? false : timeOpen} onOpenChange={(o) => !editingEntry && setTimeOpen(o)}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-32 h-10 justify-start text-sm font-normal shrink-0"
+                      disabled={Boolean(editingEntry)}
+                      className={cn(
+                        "w-32 h-10 justify-start text-sm font-normal shrink-0",
+                        editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                      )}
                     >
                       <ClockIcon className="mr-1.5 h-4 w-4 text-gray-500 shrink-0" />
                       <span className="tabular-nums text-xs">
@@ -977,7 +999,11 @@ export function LogbookEntryDialog({
                 placeholder="Enter activity title..."
                 value={activity}
                 onChange={(e) => setActivity(e.target.value)}
-                className="h-10 text-sm"
+                disabled={Boolean(editingEntry)}
+                className={cn(
+                  "h-10 text-sm",
+                  editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                )}
               />
             </div>
 
@@ -990,7 +1016,11 @@ export function LogbookEntryDialog({
                 placeholder="Describe what you did..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="min-h-[100px] text-sm resize-none"
+                disabled={Boolean(editingEntry)}
+                className={cn(
+                  "min-h-[100px] text-sm resize-none",
+                  editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                )}
               />
             </div>
 
@@ -1022,8 +1052,14 @@ export function LogbookEntryDialog({
               <Select
                 value={linkedKpiId || "none"}
                 onValueChange={handleKpiChange}
+                disabled={Boolean(editingEntry)}
               >
-                <SelectTrigger className="h-10 text-sm">
+                <SelectTrigger
+                  className={cn(
+                    "h-10 text-sm",
+                    editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                  )}
+                >
                   <SelectValue placeholder={kpisLoading ? "Loading your KPIs..." : "Select KPI"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1473,10 +1509,10 @@ export function LogbookEntryDialog({
           >
             {mutationLoading
               ? editingEntry
-                ? "Updating..."
+                ? "Resubmitting..."
                 : "Adding..."
               : editingEntry
-                ? "Update Entry"
+                ? "Update & Resubmit"
                 : "Add Entry"}
           </Button>
         </div>

@@ -5,14 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   PencilIcon,
-  TrashIcon,
   ChevronDownIcon,
   ChevronUpIcon,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useMutation } from "@apollo/client";
-import { REMOVE_LOGBOOK_ENTRY } from "@/lib/graphql/mutations/logbook";
-import { toast } from "sonner";
 import { SubmitApprovalDialog } from "./SubmitApprovalDialog";
 import { format } from "date-fns";
 import type { FrontendLogbookItem } from "@/types/logbook";
@@ -37,27 +33,6 @@ export function LogbookTableRow({
 }: LogbookTableRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
-  const [deleteEntry, { loading }] = useMutation(REMOVE_LOGBOOK_ENTRY, {
-    refetchQueries: ["GetLogbookEntries"],
-  });
-
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this entry?")) {
-      return;
-    }
-
-    try {
-      await deleteEntry({
-        variables: { logbookEntryId: item.id },
-      });
-      toast.success("Entry deleted successfully");
-      onRefetch();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete entry");
-      console.error(error);
-    }
-  };
-
   const handleEdit = () => {
     if (onEditEntry) {
       onEditEntry(item);
@@ -65,6 +40,7 @@ export function LogbookTableRow({
   };
 
   const normalizedStatus = String(item.status || "DRAFT").toUpperCase();
+  const isRejected = normalizedStatus === "REJECTED";
   const evidencePending = item.evidenceApprovalStatus === "PENDING";
   const canSubmit =
     !evidencePending &&
@@ -193,32 +169,22 @@ export function LogbookTableRow({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsSubmitDialogOpen(true)}
-                disabled={loading}
                 className="min-h-9 text-green-600 border-green-600 hover:bg-green-50"
               >
                 Submit
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleEdit}
-              disabled={loading || isLocked}
-              className="min-h-9 text-[#3838EC] border-[#3838EC] hover:bg-[#ECECFF]"
-            >
-              <PencilIcon className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDelete}
-              disabled={loading || isLocked}
-              className="min-h-9 text-red-600 border-red-600 hover:bg-red-50"
-            >
-              <TrashIcon className="w-4 h-4 mr-2" />
-              Delete
-            </Button>
+            {isRejected && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEdit}
+                className="min-h-9 text-[#3838EC] border-[#3838EC] hover:bg-[#ECECFF]"
+              >
+                <PencilIcon className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -342,32 +308,22 @@ export function LogbookTableRow({
                     variant="outline"
                     size="sm"
                     onClick={() => setIsSubmitDialogOpen(true)}
-                    disabled={loading}
                     className="min-h-9 text-green-600 border-green-600 hover:bg-green-50"
                   >
                     Submit
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleEdit}
-                  disabled={loading || isLocked}
-                  className="min-h-9 text-[#3838EC] border-[#3838EC] hover:bg-[#ECECFF]"
-                >
-                  <PencilIcon className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDelete}
-                  disabled={loading || isLocked}
-                  className="min-h-9 text-red-600 border-red-600 hover:bg-red-50"
-                >
-                  <TrashIcon className="w-4 h-4 mr-2" />
-                  Delete
-                </Button>
+                {isRejected && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEdit}
+                    className="min-h-9 text-[#3838EC] border-[#3838EC] hover:bg-[#ECECFF]"
+                  >
+                    <PencilIcon className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
               </div>
             </div>
           </td>
