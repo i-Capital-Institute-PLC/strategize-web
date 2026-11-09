@@ -10,7 +10,7 @@ import { LogbookTable } from "@/components/logbook/LogbookTable";
 import { LogbookEntryDialog } from "@/components/logbook/LogbookEntryDialog";
 import { Button } from "@/components/ui/button";
 import SyncButton from "@/components/shared/SyncButton";
-import { PlusIcon, SearchIcon, FilterIcon } from "lucide-react";
+import { SearchIcon, FilterIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { FrontendLogbookItem } from "@/types/logbook";
 
@@ -156,17 +156,6 @@ function PersonalLogbookPage() {
         </div>
         <div className="flex items-center gap-2">
           <SyncButton onSync={handleSyncLogbook} label="Sync" />
-          <Button
-            type="button"
-            onClick={() => {
-              setEditingEntry(null);
-              setIsAddEntryOpen(true);
-            }}
-            className="gap-2"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Add entry
-          </Button>
         </div>
       </div>
 
