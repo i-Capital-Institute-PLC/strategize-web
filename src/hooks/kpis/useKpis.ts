@@ -108,6 +108,7 @@ export const useKpis = (
     search?: string;
     organizationId?: string;
     strategicObjectiveId?: string;
+    assigneeId?: string;
   } = {},
 ) => {
   const { page = 1, limit = 20, ...rest } = variables;

@@ -13,6 +13,7 @@ export const GET_KPIS = gql`
     $search: String
     $organizationId: ID
     $strategicObjectiveId: ID
+    $assigneeId: ID
   ) {
     kpis(
       page: $page
@@ -20,6 +21,7 @@ export const GET_KPIS = gql`
       search: $search
       organizationId: $organizationId
       strategicObjectiveId: $strategicObjectiveId
+      assigneeId: $assigneeId
     ) {
       items {
         kpiId
@@ -300,6 +302,7 @@ export const GET_KPIS_BY_OBJECTIVE = gql`
         quarterlyAggregationMethod
         customUnitLabel
         targetValue
+        assignedTargetValue
         baselineValue
         weight
         frequency
@@ -397,6 +400,7 @@ export const GET_MY_KPIS = gql`
         quarterlyAggregationMethod
         customUnitLabel
         targetValue
+        assignedTargetValue
         baselineValue
         weight
         frequency
