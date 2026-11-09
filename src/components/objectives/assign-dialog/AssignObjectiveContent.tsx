@@ -47,7 +47,9 @@ export function AssignObjectiveContent({ onSuccess, onClose }: { onSuccess?: () 
         // If this objective was assigned to a specific type, that's the current level
         if (objective.assigneeType === "DIVISION") return "DIVISION";
         if (objective.assigneeType === "DEPARTMENT") return "DEPARTMENT";
+        if (objective.assigneeType === "UNIT") return "UNIT";
         if (objective.assigneeType === "EMPLOYEE") return "PERSONNEL";
+        if (objective.assigneeType === "PERSONNEL") return "PERSONNEL";
         // Fall back to objective type
         return objective.type || "CORPORATE";
     }, [objective]);
@@ -129,6 +131,12 @@ export function AssignObjectiveContent({ onSuccess, onClose }: { onSuccess?: () 
                         </TabsTrigger>
                     )}
                     {(effectiveLevel === "DIVISION" || effectiveLevel === "DEPARTMENT") && (
+                        <TabsTrigger value="UNIT" className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4" />
+                            Unit
+                        </TabsTrigger>
+                    )}
+                    {(effectiveLevel === "DIVISION" || effectiveLevel === "DEPARTMENT" || effectiveLevel === "UNIT") && (
                         <TabsTrigger value="PERSONNEL" className="flex items-center gap-2">
                             <Users className="w-4 h-4" />
                             Employee
@@ -141,6 +149,9 @@ export function AssignObjectiveContent({ onSuccess, onClose }: { onSuccess?: () 
                 </TabsContent>
                 <TabsContent value="DEPARTMENT">
                     <AssigneeTab type="DEPARTMENT" />
+                </TabsContent>
+                <TabsContent value="UNIT">
+                    <AssigneeTab type="UNIT" />
                 </TabsContent>
                 <TabsContent value="PERSONNEL">
                     <AssigneeTab type="PERSONNEL" />

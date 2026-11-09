@@ -12,7 +12,7 @@ import { useAssignmentData } from "@/hooks/objectives/useAssignmentData";
 
 export function AssigneeTab({
   type,
-}: { type: "DIVISION" | "DEPARTMENT" | "PERSONNEL" }) {
+}: { type: "DIVISION" | "DEPARTMENT" | "UNIT" | "PERSONNEL" }) {
   const {
     searchTerm,
     setSearchTerm,
@@ -23,23 +23,25 @@ export function AssigneeTab({
 
   const { items, loading, error } = useAssignmentData(type);
 
-  const getDisplayName = (item: Division | Department | Employee) => {
+  const getDisplayName = (item: any) => {
     if (type === "PERSONNEL") {
       return (item as Employee).fullName;
     }
-    return (item as Division | Department).name;
+    return item.name;
   };
 
-  const getId = (item: Division | Department | Employee) => {
+  const getId = (item: any) => {
     if (type === "DIVISION") {
       return (item as Division).divisionId;
     } else if (type === "DEPARTMENT") {
       return (item as Department).departmentId;
+    } else if (type === "UNIT") {
+      return item.teamId;
     }
     return (item as Employee).employeeId;
   };
 
-  const renderItemDetails = (item: Division | Department | Employee) => {
+  const renderItemDetails = (item: any) => {
     switch (type) {
       case "DIVISION": {
         const division = item as Division;
@@ -70,6 +72,26 @@ export function AssigneeTab({
           </>
         );
       }
+      case "UNIT": {
+        const unit = item;
+        return (
+          <>
+            <p className="text-sm text-gray-500">
+              Unit Lead: {unit.teamLead?.fullName || "No Unit Lead"}
+            </p>
+            {unit.department?.name && (
+              <p className="text-sm text-gray-500">
+                Department: {unit.department.name}
+              </p>
+            )}
+            {unit.division?.name && (
+              <p className="text-sm text-gray-500">
+                Division: {unit.division.name}
+              </p>
+            )}
+          </>
+        );
+      }
       case "PERSONNEL": {
         const employee = item as Employee;
         return (
@@ -88,7 +110,14 @@ export function AssigneeTab({
     }
   };
 
-  const pluralType = type === "DIVISION" ? "Divisions" : type === "DEPARTMENT" ? "Departments" : "Employees";
+  const pluralType =
+    type === "DIVISION"
+      ? "Divisions"
+      : type === "DEPARTMENT"
+        ? "Departments"
+        : type === "UNIT"
+          ? "Units"
+          : "Employees";
 
   // Typing issue workaround: hooks return broad types, needed for specific rendering
   // Ideally, useAssignmentData would return generic type T based on assignType.
@@ -124,9 +153,11 @@ export function AssigneeTab({
                     const effectiveLevel = sourceObjective?.assigneeType || sourceObjective?.type;
                     return effectiveLevel === "DEPARTMENT"
                       ? "No employees found in this department"
-                      : effectiveLevel === "DIVISION"
-                        ? "Searching for employees in this division..."
-                        : "No personnel available for selection";
+                      : effectiveLevel === "UNIT"
+                        ? "No employees found in this unit"
+                        : effectiveLevel === "DIVISION"
+                          ? "Searching for employees in this division..."
+                          : "No personnel available for selection";
                   })()}
                 </p>
                 <p className="text-xs">

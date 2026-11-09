@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle } from "lucide-react";
 import type { Kpi } from "@/types/graphql";
-
-interface Assignment {
-  assigneeId: string;
-  assigneeType: "DIVISION" | "DEPARTMENT" | "PERSONNEL";
-  assigneeName: string;
-  kpis: string[];
-}
+import type { Assignment } from "@/context/AssignmentContext";
 
 interface AssignmentListCardProps {
   assignments: Assignment[];

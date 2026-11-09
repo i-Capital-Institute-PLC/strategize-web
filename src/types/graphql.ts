@@ -324,7 +324,7 @@ export interface PaginatedStrategicPeriods {
 
 // Objective Types
 export type ObjectiveType =
-  "CORPORATE" | "DIVISION" | "DEPARTMENT" | "PERSONNEL";
+  "CORPORATE" | "DIVISION" | "DEPARTMENT" | "UNIT" | "PERSONNEL";
 export type ObjectiveStatus =
   "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
 
@@ -1038,7 +1038,7 @@ export interface CascadeObjectiveV2MutationVariables {
     objectiveId: string;
     assignerId: string;
     recipients: Array<{
-      assigneeType: "DIVISION" | "DEPARTMENT" | "PERSONNEL";
+      assigneeType: "DIVISION" | "DEPARTMENT" | "UNIT" | "PERSONNEL";
       assigneeId: string;
       kpiAllocations: Array<{
         kpiId: string;

@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import type { Objective, Kpi } from "@/types/graphql";
 
-export type AssigneeType = "DIVISION" | "DEPARTMENT" | "PERSONNEL";
+export type AssigneeType = "DIVISION" | "DEPARTMENT" | "UNIT" | "PERSONNEL";
 
 export interface Assignment {
   assigneeId: string;
@@ -103,7 +103,8 @@ export function AssignmentProvider({
   const [assigneeType, setAssigneeType] = useState<AssigneeType>(() => {
     const currentLevel = objective.assigneeType || objective.type;
     if (currentLevel === "DIVISION") return "DEPARTMENT";
-    if (currentLevel === "DEPARTMENT") return "PERSONNEL";
+    if (currentLevel === "DEPARTMENT") return "UNIT";
+    if (currentLevel === "UNIT") return "PERSONNEL";
     return "DIVISION"; // Default for CORPORATE or others
   });
 
