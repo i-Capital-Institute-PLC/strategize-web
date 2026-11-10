@@ -48,6 +48,7 @@ import { MoreHorizontal, Pencil, Trash2, Eye, Users, Plus, Loader2 } from "lucid
 import { useRouter } from "next/navigation";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuthStore } from "@/stores";
+import { usePermissions } from "@/hooks/permissions/usePermissions";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { SortableFilterableHeader } from "@/components/ui/sortable-filterable-header";
@@ -93,9 +94,13 @@ export default function UnitsTable({
   });
   const departments = deptsData?.departments?.items || [];
 
+  // Permissions & Role checks
+  const { guards } = usePermissions();
+  const canManageUnits = guards.isAdmin || guards.isSuperAdmin;
+
   // Fetch employees for unit lead and members dropdown
   const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isAdmin = canManageUnits;
 
   const { data: empsData } = useQuery(GET_EMPLOYEES, {
     variables: { 
@@ -467,14 +472,16 @@ export default function UnitsTable({
             {description}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            resetForm();
-            setShowCreate(true);
-          }}
-        >
-          <Plus className="mr-1.5 h-4 w-4" /> Add Unit
-        </Button>
+        {canManageUnits && (
+          <Button
+            onClick={() => {
+              resetForm();
+              setShowCreate(true);
+            }}
+          >
+            <Plus className="mr-1.5 h-4 w-4" /> Add Unit
+          </Button>
+        )}
       </div>
 
       {!units.length ? (
@@ -486,16 +493,20 @@ export default function UnitsTable({
             No units yet
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-6">
-            Create your first unit under a division or department to organize goals and track performance.
+            {canManageUnits
+              ? "Create your first unit under a division or department to organize goals and track performance."
+              : "No organizational units have been configured yet."}
           </p>
-          <Button
-            onClick={() => {
-              resetForm();
-              setShowCreate(true);
-            }}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Create Unit
-          </Button>
+          {canManageUnits && (
+            <Button
+              onClick={() => {
+                resetForm();
+                setShowCreate(true);
+              }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Create Unit
+            </Button>
+          )}
         </div>
       ) : (
         <div className="bg-white dark:bg-[#18181b] rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -542,7 +553,7 @@ export default function UnitsTable({
                     {...getHeaderProps("createdAt")}
                   />
                 </TableHead>
-                <TableHead className="font-semibold w-[50px]" />
+                {canManageUnits && <TableHead className="font-semibold w-[50px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -647,34 +658,36 @@ export default function UnitsTable({
                   <TableCell className="text-sm text-gray-500">
                     {formatDate(unit.createdAt)}
                   </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEdit(unit);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" /> Edit Unit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteUnit(unit);
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete Unit
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                  {canManageUnits && (
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(unit);
+                            }}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" /> Edit Unit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteUnit(unit);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Unit
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

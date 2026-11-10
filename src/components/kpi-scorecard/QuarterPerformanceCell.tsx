@@ -1,6 +1,6 @@
 import { useApolloClient, useMutation } from "@apollo/client";
 import { useState, useMemo } from "react";
-import { Loader2, ChevronDown, AlertTriangle } from "lucide-react";
+import { Loader2, ChevronDown, AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -400,47 +400,73 @@ export function QuarterPerformanceCell({
                     </div>
                   )}
 
-                  {/* Finalize button */}
+                  {/* High-impact prominent Finalize action button */}
                   {showFinalize && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
                           type="button"
-                          variant="outline"
                           size="sm"
-                          className="mt-2 h-6 w-full text-[10px]"
+                          className="mt-2.5 h-7 w-full px-1.5 text-[11px] font-bold tracking-tight shadow-sm transition-all duration-150 flex items-center justify-center gap-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white dark:from-indigo-500 dark:to-blue-600 dark:hover:from-indigo-600 dark:hover:to-blue-700 rounded border border-indigo-700/30 hover:shadow-md active:scale-95 cursor-pointer ring-1 ring-indigo-400/20"
                           disabled={isFinalizing}
+                          title={`Finalize Q${quarter} to lock balance and apply carry-forward`}
                         >
-                          {isFinalizing && (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          {isFinalizing ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Lock className="h-3 w-3 stroke-[2.5]" />
                           )}
-                          Finalize
+                          <span>Finalize</span>
+                          <span className="hidden sm:inline">Q{quarter}</span>
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent>
+                      <AlertDialogContent className="max-w-md">
                         <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            Finalize Q{quarter}?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This locks the quarter result and{" "}
-                            {quarter < 4
-                              ? Number(result!.carryOut ?? 0) < 0
-                                ? `applies a ${Math.abs(Number(result!.carryOut)).toFixed(2)} surplus credit to decrease Q${quarter + 1}'s target`
-                                : Number(result!.carryOut ?? 0) > 0
-                                  ? `transfers a ${Number(result!.carryOut).toFixed(2)} deficit to Q${quarter + 1}`
-                                  : `applies zero balance to Q${quarter + 1}`
-                              : "records the final annual balance"}
-                            . Finalized quarters cannot accept new logbook
-                            achievements.
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                              <AlertTriangle className="h-5 w-5" />
+                            </div>
+                            <AlertDialogTitle className="text-base font-bold">
+                              Finalize Quarter {quarter} & Lock Results?
+                            </AlertDialogTitle>
+                          </div>
+                          <AlertDialogDescription asChild>
+                            <div className="text-sm space-y-2 text-foreground/80 mt-1">
+                              <p>
+                                This is a permanent operational action that <strong>locks Q{quarter}</strong> and transfers the balance to the subsequent quarter.
+                              </p>
+                              <div className="p-3 rounded-lg border bg-muted/50 text-xs space-y-1.5">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Status Change:</span>
+                                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">PROVISIONAL → FINAL</span>
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                  <span className="text-muted-foreground whitespace-nowrap">Carry-Forward Impact:</span>
+                                  <span className="font-bold text-right">
+                                    {quarter < 4
+                                      ? Number(result!.carryOut ?? 0) < 0
+                                        ? `+${Math.abs(Number(result!.carryOut)).toFixed(2)} surplus credit applied to Q${quarter + 1}`
+                                        : Number(result!.carryOut ?? 0) > 0
+                                          ? `-${Number(result!.carryOut).toFixed(2)} deficit added to Q${quarter + 1} target`
+                                          : `0.00 (on-target, no adjustment)`
+                                      : "Final annual balance recorded"}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-muted-foreground pt-1.5 border-t">
+                                  Once locked, no new logbook achievements or revisions can be submitted for Q{quarter}.
+                                </div>
+                              </div>
+                            </div>
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogFooter className="mt-3">
+                          <AlertDialogCancel className="font-medium">Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleFinalize(quarter)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-sm"
                           >
-                            Finalize Quarter
+                            <Lock className="h-4 w-4" />
+                            Confirm & Finalize Q{quarter}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

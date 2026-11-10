@@ -133,10 +133,18 @@ export function ApolloWrapper({ children }: ApolloWrapperProps) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-[#09090b]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
+      <div
+        suppressHydrationWarning
+        className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-[#09090b]"
+      >
+        <div suppressHydrationWarning className="flex flex-col items-center gap-3">
+          <div
+            suppressHydrationWarning
+            className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600"
+          />
+          <p suppressHydrationWarning className="text-sm text-muted-foreground">
+            Loading...
+          </p>
         </div>
       </div>
     );
