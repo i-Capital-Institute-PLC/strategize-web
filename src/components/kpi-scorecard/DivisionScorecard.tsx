@@ -174,30 +174,38 @@ export default function DivisionScorecard({
       columns: scorecardColumns,
     });
 
-  const getAchievementColor = (rate: number): string => {
-    if (rate >= 1.0) return "text-green-600";
-    if (rate >= 0.75) return "text-blue-600";
-    if (rate >= 0.6) return "text-yellow-600";
+  const getAchievementColor = (rate: number | null | undefined): string => {
+    if (rate === null || rate === undefined || isNaN(Number(rate))) return "text-muted-foreground";
+    const val = Number(rate);
+    if (val >= 1.0) return "text-green-600";
+    if (val >= 0.75) return "text-blue-600";
+    if (val >= 0.6) return "text-yellow-600";
     return "text-red-600";
   };
 
   const getAchievementBadge = (
-    rate: number,
+    rate: number | null | undefined,
   ): { label: string; variant: any } => {
-    if (rate >= 1.3)
+    if (rate === null || rate === undefined || isNaN(Number(rate))) {
+      return { label: "Pending", variant: "outline" };
+    }
+    const val = Number(rate);
+    if (val >= 1.3)
       return { label: "Exceeds Expectations", variant: "default" };
-    if (rate >= 1.0)
+    if (val >= 1.0)
       return { label: "Meets Expectations", variant: "secondary" };
-    if (rate >= 0.75) return { label: "Needs Improvement", variant: "outline" };
+    if (val >= 0.75) return { label: "Needs Improvement", variant: "outline" };
     return { label: "Below Expectations", variant: "destructive" };
   };
 
-  const formatNumber = (num: number): string => {
-    return num.toFixed(2);
+  const formatNumber = (num: number | null | undefined): string => {
+    if (num === null || num === undefined || isNaN(Number(num))) return "0.00";
+    return Number(num).toFixed(2);
   };
 
-  const formatPercentage = (num: number): string => {
-    return `${(num * 100).toFixed(1)}%`;
+  const formatPercentage = (num: number | null | undefined): string => {
+    if (num === null || num === undefined || isNaN(Number(num))) return "0.0%";
+    return `${(Number(num) * 100).toFixed(1)}%`;
   };
 
   const selectedDivision = divisions.find(
@@ -353,7 +361,9 @@ export default function DivisionScorecard({
                 </p>
                 <Progress
                   value={
-                    (scorecard.totalScore / scorecard.maxPossibleScore) * 100
+                    scorecard.maxPossibleScore
+                      ? ((scorecard.totalScore ?? 0) / scorecard.maxPossibleScore) * 100
+                      : 0
                   }
                   className="mt-2"
                 />
@@ -503,15 +513,15 @@ export default function DivisionScorecard({
                   </thead>
                   <tbody>
                     {kpiScoreRows.map((kpiScore) => {
-                      const achievementPercent = kpiScore.achievementRate * 100;
+                      const achievementPercent = (kpiScore.achievementRate ?? 0) * 100;
                       const badge = getAchievementBadge(
                         kpiScore.achievementRate,
                       );
-                      const kpiMode = kpiScore.kpi.kpiMode || "AGGREGATED";
+                      const kpiMode = kpiScore.kpi?.kpiMode || "AGGREGATED";
                       const hasHybridBreakdown =
                         kpiMode === "HYBRID" &&
-                        kpiScore.managerActual !== undefined &&
-                        kpiScore.teamActual !== undefined;
+                        kpiScore.managerActual != null &&
+                        kpiScore.teamActual != null;
 
                       return (
                         <tr
@@ -520,8 +530,8 @@ export default function DivisionScorecard({
                         >
                           <td className="p-3">
                             <div>
-                              <p className="font-medium">{kpiScore.kpi.name}</p>
-                              {kpiScore.kpi.description && (
+                              <p className="font-medium">{kpiScore.kpi?.name}</p>
+                              {kpiScore.kpi?.description && (
                                 <p className="text-xs text-muted-foreground">
                                   {kpiScore.kpi.description}
                                 </p>
@@ -542,7 +552,7 @@ export default function DivisionScorecard({
                                 </p>
                               )}
                               {kpiMode === "HYBRID" &&
-                                kpiScore.kpi.managerRetentionPercent && (
+                                kpiScore.kpi?.managerRetentionPercent != null && (
                                   <p className="text-xs text-muted-foreground">
                                     {kpiScore.kpi.managerRetentionPercent}% mgr
                                     /{" "}
@@ -559,10 +569,9 @@ export default function DivisionScorecard({
                                     Div Head:
                                   </span>
                                   <span className="font-medium">
-                                    {formatNumber(kpiScore.managerActual!)} /{" "}
-                                    {formatNumber(kpiScore.managerTarget!)}
-                                    {kpiScore.managerAchievementRate !==
-                                      undefined && (
+                                    {formatNumber(kpiScore.managerActual)} /{" "}
+                                    {formatNumber(kpiScore.managerTarget)}
+                                    {kpiScore.managerAchievementRate != null && (
                                       <span
                                         className={`ml-1 ${getAchievementColor(kpiScore.managerAchievementRate)}`}
                                       >
@@ -581,10 +590,9 @@ export default function DivisionScorecard({
                                     Departments:
                                   </span>
                                   <span className="font-medium">
-                                    {formatNumber(kpiScore.teamActual!)} /{" "}
-                                    {formatNumber(kpiScore.teamTarget!)}
-                                    {kpiScore.teamAchievementRate !==
-                                      undefined && (
+                                    {formatNumber(kpiScore.teamActual)} /{" "}
+                                    {formatNumber(kpiScore.teamTarget)}
+                                    {kpiScore.teamAchievementRate != null && (
                                       <span
                                         className={`ml-1 ${getAchievementColor(kpiScore.teamAchievementRate)}`}
                                       >
@@ -602,9 +610,9 @@ export default function DivisionScorecard({
                           </td>
                           <td className="p-3">
                             <QuarterPerformanceCell
-                              kpiId={kpiScore.kpi.kpiId}
-                              plans={kpiScore.kpi.quarterPlans}
-                              results={kpiScore.kpi.quarterResults}
+                              kpiId={kpiScore.kpi?.kpiId}
+                              plans={kpiScore.kpi?.quarterPlans}
+                              results={kpiScore.kpi?.quarterResults}
                             />
                           </td>
                           <td className="text-right p-3 font-medium">
@@ -678,10 +686,10 @@ export default function DivisionScorecard({
                       </td>
                       <td className="text-right p-3">
                         <Badge
-                          {...getAchievementBadge(scorecard.totalScore / 100)}
+                          {...getAchievementBadge((scorecard.totalScore ?? 0) / 100)}
                         >
                           {
-                            getAchievementBadge(scorecard.totalScore / 100)
+                            getAchievementBadge((scorecard.totalScore ?? 0) / 100)
                               .label
                           }
                         </Badge>

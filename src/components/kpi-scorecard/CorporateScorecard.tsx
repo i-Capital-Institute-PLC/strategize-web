@@ -138,27 +138,38 @@ export default function CorporateScorecard({
       columns: scorecardColumns,
     });
 
-  const getAchievementColor = (rate: number): string => {
-    if (rate >= 1.0) return "text-green-600";
-    if (rate >= 0.75) return "text-blue-600";
-    if (rate >= 0.6) return "text-yellow-600";
+  const getAchievementColor = (rate: number | null | undefined): string => {
+    if (rate === null || rate === undefined || isNaN(Number(rate))) return "text-muted-foreground";
+    const val = Number(rate);
+    if (val >= 1.0) return "text-green-600";
+    if (val >= 0.75) return "text-blue-600";
+    if (val >= 0.6) return "text-yellow-600";
     return "text-red-600";
   };
 
   const getAchievementBadge = (
-    rate: number,
+    rate: number | null | undefined,
   ): { label: string; variant: any } => {
-    if (rate >= 1.3)
+    if (rate === null || rate === undefined || isNaN(Number(rate))) {
+      return { label: "Pending", variant: "outline" };
+    }
+    const val = Number(rate);
+    if (val >= 1.3)
       return { label: "Exceeds Expectations", variant: "default" };
-    if (rate >= 1.0)
+    if (val >= 1.0)
       return { label: "Meets Expectations", variant: "secondary" };
-    if (rate >= 0.75) return { label: "Needs Improvement", variant: "outline" };
+    if (val >= 0.75) return { label: "Needs Improvement", variant: "outline" };
     return { label: "Below Expectations", variant: "destructive" };
   };
 
-  const formatNumber = (num: number): string => num.toFixed(2);
-  const formatPercentage = (num: number): string =>
-    `${(num * 100).toFixed(1)}%`;
+  const formatNumber = (num: number | null | undefined): string => {
+    if (num === null || num === undefined || isNaN(Number(num))) return "0.00";
+    return Number(num).toFixed(2);
+  };
+  const formatPercentage = (num: number | null | undefined): string => {
+    if (num === null || num === undefined || isNaN(Number(num))) return "0.0%";
+    return `${(Number(num) * 100).toFixed(1)}%`;
+  };
 
   if (!canReadAll) {
     return (
