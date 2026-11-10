@@ -216,6 +216,36 @@ const navCategories: NavCategory[] = [
         ),
       },
       {
+        label: "Units",
+        href: "/dashboard/units",
+        permission: "nav:departments",
+        icon: (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+            className="text-current"
+          >
+            <path
+              d="M3 4C3 3.44772 3.44772 3 4 3H8C8.55228 3 9 3.44772 9 4V8C9 8.55228 8.55228 9 8 9H4C3.44772 9 3 8.55228 3 8V4Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M11 4C11 3.44772 11.4477 3 12 3H16C16.5523 3 17 3.44772 17 4V8C17 8.55228 16.5523 9 16 9H12C11.4477 9 11 8.55228 11 8V4Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M7 12C7 11.4477 7.44772 11 8 11H12C12.5523 11 13 11.4477 13 12V16C13 16.5523 12.5523 17 12 17H8C7.44772 17 7 16.5523 7 16V12Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
+        ),
+      },
+      {
         label: "Positions",
         href: "/dashboard/positions",
         permission: "nav:dashboard",

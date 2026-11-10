@@ -199,6 +199,7 @@ export const useTeamMutations = () => {
       organizationId: string;
       description?: string;
       departmentId?: string;
+      divisionId?: string;
       teamLeadUserId?: string;
       memberIds?: string[];
     }) => {
@@ -214,6 +215,7 @@ export const useTeamMutations = () => {
       name?: string;
       description?: string;
       departmentId?: string;
+      divisionId?: string;
       teamLeadUserId?: string;
       memberIds?: string[];
       isActive?: boolean;

@@ -12,6 +12,7 @@ export interface OrgChartNodeInput {
   level: number;
   parentId?: string;
   nodeTypeId?: string;
+  legacyId?: string;
   children: OrgChartNodeInput[];
 }
 
