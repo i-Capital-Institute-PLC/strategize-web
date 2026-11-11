@@ -120,6 +120,8 @@ export interface LogbookFormulaForContextQueryVariables {
 export interface LogbookKpiOption {
   kpiId: string;
   name: string;
+  status?: string | null;
+  targetStatus?: string | null;
   targetValue?: number | null;
   unitType?: string | null;
   measurementUnit?: string | null;
@@ -131,12 +133,23 @@ export interface LogbookKpiOption {
   calculationBasisSource?: "NONE" | "DIRECT_VALUE" | "LINKED_KPI" | null;
   actualBasisSource?: KpiActualBasisSource | null;
   directBasisValue?: string | null;
+  directBasisTargets?: Array<{
+    timeline: string;
+    value: string;
+  }> | null;
+  targets?: Array<{
+    timeline: string;
+    target: number;
+  }> | null;
   numeratorLabel?: string | null;
   denominatorLabel?: string | null;
   basisUnitType?: string | null;
   quarterPlans?: Array<{
     quarterNumber: number;
+    timeline?: string | null;
+    effectiveTarget?: number | null;
     directBasisTarget?: string | null;
+    status?: string | null;
   }>;
   objective?: {
     type?: string | null;
@@ -448,6 +461,14 @@ export interface LogbookApprovalAchievementEntry {
   kpiActualBasisExact?: string | null;
   evidenceUrl?: string | null;
   evidenceItems?: LogbookEvidence[] | null;
+  evidenceApprovalRequired?: boolean | null;
+  evidenceApprovalStatus?: string | null;
+  evidenceApproverId?: string | null;
+  evidenceApprover?: {
+    employeeId?: string | null;
+    fullName?: string | null;
+    title?: string | null;
+  } | null;
   metricObservations?: LogbookMetricObservation[] | null;
   linkedKpi?: {
     kpiId?: string | null;

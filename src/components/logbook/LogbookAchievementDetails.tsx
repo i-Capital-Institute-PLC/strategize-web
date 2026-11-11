@@ -3,7 +3,7 @@
 import { AttachmentTrigger } from "@/components/files/AttachmentTrigger";
 import { Badge } from "@/components/ui/badge";
 import type { LogbookApprovalAchievementEntry } from "@/types/logbook";
-import { BarChart3, FileText, Target } from "lucide-react";
+import { BarChart3, CheckCircle2, FileText, Target } from "lucide-react";
 
 interface LogbookAchievementDetailsProps {
   entry: LogbookApprovalAchievementEntry;
@@ -193,7 +193,20 @@ export function LogbookAchievementDetails({
         </div>
       )}
 
+      {!summaryOnly && entry.evidenceApprovalStatus?.toUpperCase() === "APPROVED" && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <p className="flex items-center gap-2 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Evidence Verified & Approved
+          </p>
+          <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+            Performance evidence was verified and approved by{" "}
+            {entry.evidenceApprover?.fullName || "the designated Evidence Approver"}.
+          </p>
+        </div>
+      )}
+
       {!summaryOnly &&
+        entry.evidenceApprovalStatus?.toUpperCase() !== "APPROVED" &&
         (Boolean(entry.evidenceItems?.length) || entry.evidenceUrl) && (
           <div className="rounded-lg border p-4">
             <p className="text-sm font-semibold">Supporting evidence</p>

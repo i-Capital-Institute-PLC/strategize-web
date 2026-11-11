@@ -1246,41 +1246,49 @@ const SubmissionApprovalTable: React.FC<SubmissionApprovalTableProps> = ({
 
                                             // For other objectives, show parent KPI in first column and child KPI in second column
                                             // Find the actual parent KPI for this specific child KPI
-                                            const parentName = (() => {
-                                              // Try to find the KPI in allKpis to get parent information
-                                              if (allKpis) {
-                                                const fullKpi = allKpis.find(
-                                                  (k) =>
-                                                    k.kpiId ===
-                                                    kpiSubmission.kpi?.kpiId,
-                                                );
-                                                if (fullKpi?.parent?.name) {
-                                                  return fullKpi.parent.name;
+                                            const resolvedParentInfo = (() => {
+                                                const childKpiId = kpiSubmission.kpi?.kpiId;
+                                                const fullKpi = childKpiId && allKpis
+                                                  ? allKpis.find((k) => k.kpiId === childKpiId)
+                                                  : undefined;
+
+                                                if ((fullKpi as any)?.parent?.name) {
+                                                  return { name: (fullKpi as any).parent.name, isCascaded: true };
                                                 }
-                                              }
+                                                if ((kpiSubmission.kpi as any)?.parent?.name) {
+                                                  return { name: (kpiSubmission.kpi as any).parent.name, isCascaded: true };
+                                                }
 
-                                              // Fallback to index-based matching (less reliable)
-                                              const parentKpi = (parent?.kpis ||
-                                                [])[kpiIdx];
-                                              if (parentKpi?.name) {
-                                                return parentKpi.name;
-                                              }
+                                                const parentKpiId =
+                                                  (fullKpi as any)?.parent?.kpiId ||
+                                                  (fullKpi as any)?.parentId ||
+                                                  (kpiSubmission.kpi as any)?.parent?.kpiId ||
+                                                  (kpiSubmission.kpi as any)?.parentId;
+                                                if (parentKpiId) {
+                                                  const parentKpi =
+                                                    parent?.kpis?.find((p) => p.kpiId === parentKpiId) ||
+                                                    allKpis?.find((k) => k.kpiId === parentKpiId);
+                                                  if (parentKpi?.name) {
+                                                    return { name: parentKpi.name, isCascaded: true };
+                                                  }
+                                                }
 
-                                              // If no parent found, show the child KPI name in the first column
+                                                return {
+                                                  name: kpiSubmission.kpi?.name || "Standalone Metric",
+                                                  isCascaded: false,
+                                                };
+                                              })();
+                                              const parentName = resolvedParentInfo.name;
+
                                               return (
-                                                kpiSubmission.kpi?.name || "N/A"
-                                              );
-                                            })();
-
-                                            return (
-                                              <>
-                                                <TableCell className="px-4 py-3 font-medium text-gray-900">
-                                                  <div
-                                                    className="truncate"
-                                                    title={parentName}
-                                                  >
-                                                    {parentName}
-                                                    {parent && (
+                                                <>
+                                                  <TableCell className="px-4 py-3 font-medium text-gray-900">
+                                                    <div
+                                                      className="truncate"
+                                                      title={parentName}
+                                                    >
+                                                      {parentName}
+                                                      {resolvedParentInfo.isCascaded && parent && (
                                                       <div className="text-xs text-gray-500 mt-1">
                                                         From:{" "}
                                                         {obj.objective?.type ===

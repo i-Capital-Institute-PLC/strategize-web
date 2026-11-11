@@ -260,7 +260,7 @@ const apolloClient = new ApolloClient({
   defaultOptions: {
     watchQuery: {
       errorPolicy: "all",
-      fetchPolicy: "cache-first", // Prioritize cache for better performance
+      fetchPolicy: "cache-and-network", // Instant 0ms cache read + background freshness sync
       nextFetchPolicy: "cache-first", // Keep using cache after initial load
     },
     query: {

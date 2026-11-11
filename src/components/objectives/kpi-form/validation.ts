@@ -90,7 +90,9 @@ export const getAssignedTarget = (
         kpi.quarterlyAggregationMethod === "AVERAGE" ||
         (!kpi.quarterlyAggregationMethod &&
           (kpi.unitType === "PERCENT" || kpi.unitType === "RATIO"));
-      return shouldAverage ? sum / quarterlyTargets.length : sum;
+      const activeTargets = quarterlyTargets.filter((t) => Number(t.target) > 0);
+      const divisor = activeTargets.length > 0 ? activeTargets.length : (quarterlyTargets.length || 1);
+      return shouldAverage ? sum / divisor : sum;
     }
   }
 
@@ -134,7 +136,14 @@ export const validateQuarterlyBreakdown = (
   }
   //here is tollerance 0.01
   const TOLERANCE = 0.001;
-  const currentVal = shouldAverage ? currentSum / 4 : currentSum;
+  const quarters = yearlyQuarters[year];
+  const activeQuarters = quarters
+    ? [quarters.q1, quarters.q2, quarters.q3, quarters.q4].filter(
+        (v) => v !== "" && Number(v) > 0,
+      )
+    : [];
+  const divisor = activeQuarters.length > 0 ? activeQuarters.length : 1;
+  const currentVal = shouldAverage ? currentSum / divisor : currentSum;
 
   if (currentVal < assignedTarget - TOLERANCE) {
     return {

@@ -251,7 +251,7 @@ export function QuarterStrip({
                   </div>
                   {isNotDue ? (
                     <Badge variant="secondary" className="rounded-full text-xs font-semibold">
-                      Not due
+                      Not due this quarter
                     </Badge>
                   ) : (
                     <TrafficBadge status={status} />
@@ -298,7 +298,7 @@ export function QuarterStrip({
                   <span className="font-semibold text-slate-700 dark:text-zinc-300">
                     {percent(coverage)}
                   </span>{" "}
-                  coverage · {summary?.pendingResultCount ?? 0} pending
+                  result coverage · {summary?.pendingResultCount ?? 0} pending
                   {Boolean(summary?.notDueCount) &&
                     ` · ${summary?.notDueCount} not due`}
                 </p>

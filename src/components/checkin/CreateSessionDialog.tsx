@@ -60,6 +60,21 @@ interface CreateSessionDialogProps {
   onSuccess?: () => void;
 }
 
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getComingSaturday = (startDate: Date): Date => {
+  const result = new Date(startDate);
+  const dayOfWeek = startDate.getDay(); // 0 = Sun, 6 = Sat
+  const daysUntilSaturday = dayOfWeek === 6 ? 7 : 6 - dayOfWeek;
+  result.setDate(startDate.getDate() + daysUntilSaturday);
+  return result;
+};
+
 export default function CreateSessionDialog({
   open,
   onOpenChange,
@@ -332,21 +347,17 @@ export default function CreateSessionDialog({
   //   }
   // }, [weekStartDate]);
 
-  // Set default start date to today
+  // Set default start date to today and end date to the coming Saturday
   useEffect(() => {
     if (open && !weekStartDate) {
-      const today = new Date();
-      setWeekStartDate(today.toISOString().split("T")[0]);
-
-      // Set default end date to 7 days from today
-      const defaultEndDate = new Date(today);
-      defaultEndDate.setDate(today.getDate() + 6);
-      setWeekEndDate(defaultEndDate.toISOString().split("T")[0]);
+      const now = new Date();
+      setWeekStartDate(formatLocalDate(now));
+      setWeekEndDate(formatLocalDate(getComingSaturday(now)));
     }
   }, [open, weekStartDate]);
 
   // Get today's date for min attribute
-  const today = new Date().toISOString().split("T")[0];
+  const today = useMemo(() => formatLocalDate(new Date()), []);
 
   // Calculate session duration
   const sessionDuration = useMemo(() => {
@@ -637,8 +648,14 @@ export default function CreateSessionDialog({
                       type="date"
                       value={weekStartDate}
                       onChange={(e) => {
-                        setWeekStartDate(e.target.value);
+                        const newStart = e.target.value;
+                        setWeekStartDate(newStart);
                         setSelectedEmployees([]);
+                        if (newStart) {
+                          const [y, m, d] = newStart.split("-").map(Number);
+                          const parsedStart = new Date(y, m - 1, d);
+                          setWeekEndDate(formatLocalDate(getComingSaturday(parsedStart)));
+                        }
                       }}
                       min={today}
                       className="pl-10"

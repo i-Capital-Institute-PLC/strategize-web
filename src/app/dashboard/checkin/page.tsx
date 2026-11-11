@@ -20,6 +20,7 @@ import { AddTaskDialog } from "@/components/checkin/AddTaskDialog";
 import { FilterDialog, FilterState } from "@/components/checkin/FilterDialog";
 import CreateSessionDialog from "@/components/checkin/CreateSessionDialog";
 import SessionListView from "@/components/checkin/SessionListView";
+import SyncButton from "@/components/shared/SyncButton";
 import { TaskColorLegend } from "@/components/checkin/TaskColorLegend";
 import { WeeklySubmissionPanel } from "@/components/checkin/WeeklySubmissionPanel";
 import { ScheduleCalendar } from "@/components/checkin/ScheduleCalendar";
@@ -136,10 +137,9 @@ function EmployeeTaskCard({
       limit: 100,
       page: 1,
     },
-    // Avoid N+1: only fetch when the card is expanded. Collapsed cards reuse
-    // Apollo cache when re-opened (cache-first).
+    // Fetch fresh tasks when card is expanded, showing cache immediately
     skip: !session.checkinoutSessionId || !isExpanded,
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
 
@@ -898,7 +898,7 @@ export default function CheckInPage() {
       page: 1,
     },
     skip: !currentWeekData?.id || isManagerMode,
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
 
@@ -924,12 +924,20 @@ export default function CheckInPage() {
   } = useQuery(GET_TASK_POOL_SUMMARY, {
     variables: { sessionId: currentWeekData?.id },
     skip: !currentWeekData?.id || isManagerMode,
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     onError: (error) => {
       toast.error(error.message || "Could not load the weekly task pool.");
     },
   });
+
+  const handleSyncCheckin = async () => {
+    await Promise.allSettled([
+      refetchAll(),
+      refetchTasks(),
+      refetchPoolSummary(),
+    ]);
+  };
 
   const [submitWeeklyTasks, { loading: submittingWeeklyTasks }] = useMutation(
     SUBMIT_WEEKLY_TASKS,
@@ -1327,6 +1335,9 @@ export default function CheckInPage() {
   if (view === "list") {
     return (
       <div className="h-full">
+        <div className="flex justify-end mb-4">
+          <SyncButton onSync={handleSyncCheckin} label="Sync" />
+        </div>
         <ScheduleCalendar
           currentUser={currentUser}
           onSelectSession={handleSelectSession}
@@ -1397,7 +1408,9 @@ export default function CheckInPage() {
           )}
         </div>
 
-        {isManagerMode && (
+        <div className="flex items-center gap-2">
+          <SyncButton onSync={handleSyncCheckin} label="Sync" />
+          {isManagerMode && (
           <Button
             onClick={handleAddMyTaskClick}
             disabled={creatingMySession || sessionReadOnly}
@@ -1407,6 +1420,7 @@ export default function CheckInPage() {
             {creatingMySession ? "Preparing..." : "Add My Task"}
           </Button>
         )}
+        </div>
       </div>
 
       {/* Original Header */}

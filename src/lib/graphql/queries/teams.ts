@@ -9,21 +9,31 @@ export const GET_TEAMS = gql`
     $limit: Int!
     $search: String
     $departmentId: ID
+    $divisionId: ID
   ) {
     teams(
       page: $page
       limit: $limit
       search: $search
       departmentId: $departmentId
+      divisionId: $divisionId
     ) {
       items {
         teamId
         name
         description
         isActive
+        division {
+          divisionId
+          name
+        }
         department {
           departmentId
           name
+          division {
+            divisionId
+            name
+          }
         }
         teamLead {
           employeeId
@@ -53,6 +63,10 @@ export const GET_TEAM = gql`
       description
       isActive
       isDeleted
+      division {
+        divisionId
+        name
+      }
       department {
         departmentId
         name

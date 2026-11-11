@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Users } from "lucide-react";
-import { AssignmentProvider } from "@/context/AssignmentContext";
+import { useQuery } from "@apollo/client";
+import { GET_KPIS } from "@/lib/graphql/queries/kpis";
+import {
+  AssignmentProvider,
+  type ExistingAllocation,
+  type ExistingKpiAllocations,
+} from "@/context/AssignmentContext";
 import type { Objective, Kpi } from "@/types/graphql";
 import { AssignObjectiveContent } from "./assign-dialog";
 
@@ -28,7 +34,45 @@ export default function AssignObjectiveDialog({
   kpis,
   onSuccess,
 }: AssignObjectiveDialogProps) {
-  // If dialog is not open, don't render content to avoid unnecessary mounts/fetches
+  const organizationId = (objective as any)?.organizationId;
+
+  const { data: allKpisData } = useQuery(GET_KPIS, {
+    variables: {
+      organizationId,
+      limit: 1000,
+    },
+    skip: !open || !organizationId,
+    fetchPolicy: "network-only",
+  });
+
+  const existingAllocations = useMemo(() => {
+    if (!open || !kpis) return {};
+    const map: Record<string, ExistingKpiAllocations> = {};
+    const items = allKpisData?.kpis?.items || [];
+    for (const kpi of kpis) {
+      const children = items.filter(
+        (item: any) => item.parent?.kpiId === kpi.kpiId && !item.isDeleted,
+      );
+      const allocations: ExistingAllocation[] = children.map((c: any) => ({
+        assigneeId: c.assigneeId,
+        assigneeType: c.assigneeType,
+        assigneeName: c.createdBy?.fullName || c.name || "Assigned",
+        targetValue: Number(c.assignedTargetValue ?? c.targetValue ?? 0),
+        directBasisValue: c.directBasisValue || undefined,
+      }));
+      map[kpi.kpiId] = {
+        totalTarget: allocations.reduce((sum, a) => sum + a.targetValue, 0),
+        totalBasis: allocations.reduce(
+          (sum, a) => sum + (Number(a.directBasisValue) || 0),
+          0,
+        ),
+        allocations,
+      };
+    }
+    return map;
+  }, [allKpisData, kpis, open]);
+
+  // If dialog is not open, don't render content to avoid unnecessary mounts
   if (!open) return null;
 
   return (
@@ -54,7 +98,11 @@ export default function AssignObjectiveDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <AssignmentProvider objective={objective} kpis={kpis}>
+        <AssignmentProvider
+          objective={objective}
+          kpis={kpis}
+          existingAllocations={existingAllocations}
+        >
           <AssignObjectiveContent onSuccess={onSuccess} onClose={() => onOpenChange(false)} />
         </AssignmentProvider>
       </DialogContent>

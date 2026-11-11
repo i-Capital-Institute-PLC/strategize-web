@@ -694,8 +694,8 @@ export default function UnifiedPerformanceReport({
       {/* Individual Team Member Ranking */}
       <Card className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-white/[0.08] dark:bg-zinc-900/90 sm:p-7">
         <CardHeader className="p-0 pb-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
               <CardTitle className="text-base font-bold text-slate-900 dark:text-zinc-100">
                 Individual Performance Rankings
               </CardTitle>
@@ -708,10 +708,21 @@ export default function UnifiedPerformanceReport({
               onValueChange={(value) =>
                 setRankingMode(value as "kpi" | "overall")
               }
+              className="w-full sm:w-auto shrink-0"
             >
-              <TabsList className="grid grid-cols-2">
-                <TabsTrigger value="kpi">KPI achievement</TabsTrigger>
-                <TabsTrigger value="overall">Live composite</TabsTrigger>
+              <TabsList className="grid w-full sm:w-[280px] grid-cols-2 p-1 bg-slate-100 dark:bg-zinc-800 rounded-xl border border-slate-200/80 dark:border-zinc-700/80">
+                <TabsTrigger
+                  value="kpi"
+                  className="rounded-lg text-xs font-semibold py-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs dark:data-[state=active]:bg-zinc-900 dark:data-[state=active]:text-white"
+                >
+                  KPI achievement
+                </TabsTrigger>
+                <TabsTrigger
+                  value="overall"
+                  className="rounded-lg text-xs font-semibold py-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs dark:data-[state=active]:bg-zinc-900 dark:data-[state=active]:text-white"
+                >
+                  Live composite
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -769,28 +780,36 @@ export default function UnifiedPerformanceReport({
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/60">
-                      <span className="text-slate-400">KPI:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-white/80 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/60">
+                      <span className="font-medium text-slate-500 dark:text-zinc-400">KPI:</span>
                       <span className="font-bold tabular-nums text-blue-600 dark:text-blue-400">
                         {result.breakdown.kpiScore.percentageAchieved.toFixed(1)}%
                       </span>
                     </div>
-                    <div className="flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/60">
-                      <span className="text-slate-400">Competency:</span>
-                      <span className="font-bold tabular-nums text-purple-600 dark:text-purple-400">
-                        {result.breakdown.competencyScore.isAvailable
-                          ? `${result.breakdown.competencyScore.percentageAchieved.toFixed(1)}%`
-                          : "Pending"}
-                      </span>
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-white/80 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/60">
+                      <span className="font-medium text-slate-500 dark:text-zinc-400">Competency:</span>
+                      {result.breakdown.competencyScore.isAvailable ? (
+                        <span className="font-bold tabular-nums text-purple-600 dark:text-purple-400">
+                          {result.breakdown.competencyScore.percentageAchieved.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
+                          Pending
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-1.5 dark:bg-zinc-900/60">
-                      <span className="text-slate-400">Activity:</span>
-                      <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                        {result.breakdown.activityScore.isAvailable
-                          ? `${result.breakdown.activityScore.percentageAchieved.toFixed(1)}%`
-                          : "Pending"}
-                      </span>
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-white/80 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/60">
+                      <span className="font-medium text-slate-500 dark:text-zinc-400">Activity:</span>
+                      {result.breakdown.activityScore.isAvailable ? (
+                        <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                          {result.breakdown.activityScore.percentageAchieved.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
+                          Pending
+                        </span>
+                      )}
                     </div>
                   </div>
                   {rankingMode === "overall" && result.isProvisional && (

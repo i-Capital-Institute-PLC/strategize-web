@@ -23,7 +23,7 @@ export function useNodeTypes() {
   const { data, loading, refetch } = useQuery(GET_NODE_TYPES, {
     variables: { organizationId },
     skip: !organizationId,
-    fetchPolicy: 'cache-first',
+    fetchPolicy: 'cache-and-network',
     nextFetchPolicy: 'cache-first',
   });
 

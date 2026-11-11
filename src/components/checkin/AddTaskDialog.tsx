@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useMutation, useQuery } from "@apollo/client";
 import {
   CREATE_CHECKINOUT_TASK,
@@ -11,7 +11,6 @@ import { linkedKpiLabel, useLinkedKpis } from "@/hooks/kpis/useLinkedKpis";
 import { GET_INITIATIVES } from "@/lib/graphql/queries/initiatives";
 import { GET_EMPLOYEES } from "@/lib/graphql/queries/employees";
 import { useAuthStore, useOrgUnitStore, useStrategicPeriodStore } from "@/stores";
-import { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -249,6 +248,44 @@ export function AddTaskDialog({
   const [showAvailability, setShowAvailability] = useState(false);
   const evidenceUploadRequestId = useRef(0);
 
+  // Session date bounds to keep task dates strictly within [today, sessionEndDate]
+  const sessionStartDate = useMemo(() => {
+    if (!session) return null;
+    const raw = session.weekStartDate || session.startDate;
+    if (!raw) return null;
+    const match = typeof raw === "string" ? raw.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+    const dt = match
+      ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0, 0)
+      : new Date(raw);
+    if (!match) dt.setHours(0, 0, 0, 0);
+    return dt;
+  }, [session]);
+
+  const sessionEndDate = useMemo(() => {
+    if (!session) return null;
+    const raw = session.weekEndDate || session.endDate;
+    if (!raw) return null;
+    const match = typeof raw === "string" ? raw.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+    const dt = match
+      ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 23, 59, 59, 999)
+      : new Date(raw);
+    if (!match) dt.setHours(23, 59, 59, 999);
+    return dt;
+  }, [session]);
+
+  const getInitialStartDate = useCallback(() => {
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+
+    if (sessionStartDate && todayMidnight < sessionStartDate.getTime()) {
+      return new Date(sessionStartDate);
+    }
+    if (sessionEndDate && todayMidnight > sessionEndDate.getTime()) {
+      return new Date(sessionEndDate);
+    }
+    return now;
+  }, [sessionStartDate, sessionEndDate]);
+
   // ✅ Track popover open states separately so they don't conflict
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
@@ -257,7 +294,7 @@ export function AddTaskDialog({
 
   function resetForm() {
     evidenceUploadRequestId.current += 1;
-    const newToday = new Date();
+    const initialDate = getInitialStartDate();
     setTaskType(DEFAULT_TASK_TYPE);
     setTask("");
     setDescription("");
@@ -265,9 +302,9 @@ export function AddTaskDialog({
     setCollaborationMessage("");
     setLinkedKpi("");
     setLinkedInitiative("");
-    setStartDate(newToday);
+    setStartDate(initialDate);
     setStartTime({ hour: "07", minute: "00", period: "AM" });
-    setEndDate(new Date(newToday));
+    setEndDate(new Date(initialDate));
     setEndTime({ hour: "08", minute: "00", period: "AM" });
     setCheckoutStatus("");
     setAttachment(null);
@@ -279,6 +316,15 @@ export function AddTaskDialog({
     setIsMidWeekTask(initialIsMidWeek);
     setScheduleError(null);
   }
+
+  // Ensure initial task date falls within valid bounds when opening for new task
+  useEffect(() => {
+    if (open && !editingTask) {
+      const initialDate = getInitialStartDate();
+      setStartDate(initialDate);
+      setEndDate(new Date(initialDate));
+    }
+  }, [open, editingTask, getInitialStartDate]);
 
   // Populate form when editing
   useEffect(() => {
@@ -467,6 +513,19 @@ export function AddTaskDialog({
       'optimize', 'debug', 'migrate', 'release', 'maintain',
       'upgrade', 'automate', 'prototype', 'architect', 'troubleshoot',
       'enhance', 'improve',
+      'code', 'program', 'script', 'scaffold', 'bootstrap',
+      'stub', 'mock', 'sandbox', 'modularize', 'decouple',
+      'encapsulate', 'benchmark', 'profile', 'instrument', 'fuzz',
+      'lint', 'audit', 'inspect', 'sanitize', 'trace',
+      'diagnose', 'reproduce', 'isolate', 'patch', 'hotfix',
+      'remediate', 'fix', 'commit', 'branch', 'merge',
+      'rebase', 'cherry-pick', 'sync', 'synchronize', 'stash',
+      'dockerize', 'containerize', 'provision', 'orchestrate', 'pipeline',
+      'publish', 'tag', 'seed', 'backfill', 'reconcile',
+      'persist', 'cache', 'flush', 'index', 'query',
+      'serialize', 'deserialize', 'normalize', 'denormalize', 'compile',
+      'transpile', 'bundle', 'minify', 'telemetry', 'log',
+      'throttle',
       // Investment
       'assess', 'appraise', 'underwrite', 'structure', 'negotiate',
       'forecast', 'model', 'allocate', 'screen', 'value',
@@ -578,25 +637,32 @@ export function AddTaskDialog({
 
     // Draft and personal-to-do edits obey the same session date range as create.
     if (session && isPlanningForm) {
-      const rawSessionEnd = session.weekEndDate || session.endDate;
-      const dateOnlyMatch =
-        typeof rawSessionEnd === "string"
-          ? rawSessionEnd.match(/^(\d{4})-(\d{2})-(\d{2})/)
-          : null;
-      const sessionEndDate = dateOnlyMatch
-        ? new Date(
-            Number(dateOnlyMatch[1]),
-            Number(dateOnlyMatch[2]) - 1,
-            Number(dateOnlyMatch[3]),
-            23,
-            59,
-            59,
-            999,
-          )
-        : new Date(rawSessionEnd);
-      if (!dateOnlyMatch) sessionEndDate.setHours(23, 59, 59, 999);
+      if (!editingTask) {
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+        if (taskStartDateTime < todayMidnight) {
+          const message = "Task start date cannot be in the past.";
+          setScheduleError(message);
+          toast.warning("Check the task schedule", { description: message });
+          return;
+        }
+      }
 
-      if (taskEndDateTime > sessionEndDate) {
+      if (sessionStartDate && taskStartDateTime < sessionStartDate) {
+        const message = `Task start date cannot be before session start date (${format(sessionStartDate, "MMM d, yyyy")}).`;
+        setScheduleError(message);
+        toast.warning("Check the task schedule", { description: message });
+        return;
+      }
+
+      if (sessionEndDate && taskStartDateTime > sessionEndDate) {
+        const message = `Task start date cannot be after session end date (${format(sessionEndDate, "MMM d, yyyy")}).`;
+        setScheduleError(message);
+        toast.warning("Check the task schedule", { description: message });
+        return;
+      }
+
+      if (sessionEndDate && taskEndDateTime > sessionEndDate) {
         const message = `Task end date cannot be after session end date (${format(sessionEndDate, "MMM d, yyyy")}).`;
         setScheduleError(message);
         toast.warning("Check the task schedule", { description: message });
@@ -883,7 +949,7 @@ export function AddTaskDialog({
                 )}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                💡 Start with an action verb: Prepare, Submit, Meet, Review, Complete, etc.
+                💡 Start with an action verb: Develop, Code, Refactor, Deploy, Review, Prepare, Test, etc.
               </p>
 
               {/* Mid-Week Task Checkbox */}
@@ -1014,9 +1080,24 @@ export function AddTaskDialog({
                       mode="single"
                       selected={startDate}
                       onSelect={handleStartDateChange}
-                      disabled={(d) =>
-                        d < new Date(new Date().setHours(0, 0, 0, 0))
-                      }
+                      disabled={(d) => {
+                        const dMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                        const now = new Date();
+                        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                        const minTime = editingTask
+                          ? (sessionStartDate ? sessionStartDate.getTime() : 0)
+                          : (sessionStartDate ? Math.max(todayMidnight, sessionStartDate.getTime()) : todayMidnight);
+                        if (dMidnight < minTime) return true;
+                        if (sessionEndDate) {
+                          const sessionEndMidnight = new Date(
+                            sessionEndDate.getFullYear(),
+                            sessionEndDate.getMonth(),
+                            sessionEndDate.getDate(),
+                          ).getTime();
+                          if (dMidnight > sessionEndMidnight) return true;
+                        }
+                        return false;
+                      }}
                       initialFocus
                     />
                   </PopoverContent>
@@ -1107,10 +1188,18 @@ export function AddTaskDialog({
                         }
                       }}
                       disabled={(d) => {
-                        // Allow same day or future dates
-                        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-                        const checkDateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                        return checkDateOnly < startDateOnly;
+                        const dMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                        const startDateMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime();
+                        if (dMidnight < startDateMidnight) return true;
+                        if (sessionEndDate) {
+                          const sessionEndMidnight = new Date(
+                            sessionEndDate.getFullYear(),
+                            sessionEndDate.getMonth(),
+                            sessionEndDate.getDate(),
+                          ).getTime();
+                          if (dMidnight > sessionEndMidnight) return true;
+                        }
+                        return false;
                       }}
                       initialFocus
                     />

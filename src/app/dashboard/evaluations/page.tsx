@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { useApolloClient } from "@apollo/client";
+import SyncButton from "@/components/shared/SyncButton";
 import { FileDown } from "lucide-react";
 import { usePermissions } from "@/hooks/permissions/usePermissions";
 import { useEvaluationCycles } from "@/hooks/evaluations/useEvaluationCycles";
@@ -20,7 +22,8 @@ function EvaluationsContent() {
   const [activeTab, setActiveTab] = useState(
     searchParams.get("tab") || "overview",
   );
-  const { cycles } = useEvaluationCycles(
+  const apolloClient = useApolloClient();
+  const { cycles, refetch: refetchCycles } = useEvaluationCycles(
     1,
     1,
     "",
@@ -38,6 +41,15 @@ function EvaluationsContent() {
     can("evaluations:read_department") ||
     can("evaluations:read_division") ||
     can("evaluations:read_all");
+
+  const handleSyncEvaluations = async () => {
+    await Promise.allSettled([
+      refetchCycles?.(),
+      apolloClient.refetchQueries({
+        include: ["GetEvaluationCycles", "GetEvaluationCycle", "GetEvaluationAssignments"],
+      }),
+    ]);
+  };
 
   const handleExport = () => {
     // TODO: Implement export functionality
@@ -63,10 +75,13 @@ function EvaluationsContent() {
             )}
           </div>
         </div>
-        <Button onClick={handleExport} variant="outline" className="gap-2">
-          <FileDown className="h-4 w-4" />
-          Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <SyncButton onSync={handleSyncEvaluations} label="Sync" />
+          <Button onClick={handleExport} variant="outline" className="gap-2">
+            <FileDown className="h-4 w-4" />
+            Export
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}

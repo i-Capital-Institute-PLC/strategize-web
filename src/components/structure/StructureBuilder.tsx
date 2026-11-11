@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Save } from "lucide-react";
 import StructureNode from "./StructureNode";
@@ -17,6 +17,7 @@ interface NodeData {
   color: string;
   level: number;
   parentId?: string;
+  legacyId?: string;
   children: NodeData[];
 }
 
@@ -27,14 +28,58 @@ interface StructureBuilderProps {
   canManage: boolean;
 }
 
-const LEVEL_COLORS = ["#5B5BF7", "#8B5CF6", "#EC4899", "#F43F5E", "#EF4444"];
+const LEVEL_COLORS = ["#5B5BF7", "#8B5CF6", "#EC4899", "#0D9488", "#EF4444"];
 
 function mapLiveNode(node: OrgChartNode): NodeData {
+  const typeName = node.nodeType?.name?.toLowerCase() ?? "";
+  const subLower = (node.subtitle ?? "").toLowerCase();
+
+  const isUnit =
+    typeName === "unit" ||
+    subLower === "unit" ||
+    subLower.includes("task force") ||
+    subLower.includes("unit lead") ||
+    subLower.includes("team leader");
+
+  const isDepartment =
+    typeName === "department" ||
+    subLower === "department" ||
+    subLower.includes("manager");
+
+  const isDivision =
+    typeName === "division" ||
+    subLower === "division" ||
+    subLower.includes("director");
+
+  // Subtitle resolution: display "Unit" for units, "Department" for departments, "Division" for divisions
+  let subtitle = node.subtitle?.trim();
+  if (!subtitle) {
+    if (isUnit) subtitle = "Unit";
+    else if (isDepartment) subtitle = "Department";
+    else if (isDivision) subtitle = "Division";
+    else if (node.level === 0) subtitle = "CEO";
+    else if (node.level === 1) subtitle = "Division";
+    else if (node.level === 2) subtitle = isUnit ? "Unit" : "Department";
+    else subtitle = "Unit";
+  }
+
+  // Color resolution: Unit uses distinct #0D9488 (Teal), never Department pink (#EC4899)
+  let color = node.color;
+  if (isUnit) {
+    color = "#0D9488"; // Distinct Teal for Unit
+  } else if (!color || (color === "#EC4899" && isDivision)) {
+    if (isDivision) color = "#8B5CF6";
+    else if (isDepartment) color = "#EC4899";
+    else if (node.level === 0) color = "#5B5BF7";
+    else color = LEVEL_COLORS[Math.min(node.level, LEVEL_COLORS.length - 1)];
+  }
+
   return {
     id: node.id,
+    legacyId: node.legacyId ?? undefined,
     name: node.name,
-    subtitle: node.subtitle ?? undefined,
-    color: node.color ?? LEVEL_COLORS[Math.min(node.level, LEVEL_COLORS.length - 1)],
+    subtitle,
+    color: color || "#0D9488",
     level: node.level,
     parentId: node.parentId ?? undefined,
     children: node.children.map(mapLiveNode),
@@ -44,6 +89,7 @@ function mapLiveNode(node: OrgChartNode): NodeData {
 function toInput(node: NodeData): OrgChartNodeInput {
   return {
     id: node.id,
+    legacyId: node.legacyId,
     name: node.name,
     subtitle: node.subtitle,
     color: node.color,
@@ -85,11 +131,22 @@ export default function StructureBuilder({ templateId, liveData, liveLoading, ca
   const [zoom, setZoom] = useState(100);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [selectedParentNode, setSelectedParentNode] = useState<NodeData | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [structure, setStructure] = useState<NodeData>(SAMPLE_STRUCTURE);
   const [isDirty, setIsDirty] = useState(false);
 
   const { saveOrgChart, loading: saving } = useOrgChartMutations();
+
+  // Helper to find a node by ID in the tree
+  const findNode = (node: NodeData, id: string): NodeData | null => {
+    if (node.id === id) return node;
+    for (const child of node.children) {
+      const found = findNode(child, id);
+      if (found) return found;
+    }
+    return null;
+  };
 
   // Start slightly zoomed out on narrow screens so the tree fits better
   useEffect(() => {
@@ -107,29 +164,90 @@ export default function StructureBuilder({ templateId, liveData, liveLoading, ca
 
   const handleAddChild = useCallback((parentId: string) => {
     if (!canManage) return;
+    const parent = findNode(structure, parentId);
     setSelectedParentId(parentId);
+    setSelectedParentNode(parent);
     setShowAddDialog(true);
-  }, [canManage]);
+  }, [canManage, structure]);
+
+  const existingNodeNames = useMemo(() => {
+    const names = new Set<string>();
+    const traverse = (n: NodeData) => {
+      if (n.name) names.add(n.name.toLowerCase());
+      n.children?.forEach(traverse);
+    };
+    traverse(structure);
+    return names;
+  }, [structure]);
 
   const handleAddNode = useCallback(
-    (name: string, subtitle: string) => {
+    (
+      nameOrParams:
+        | string
+        | {
+            name: string;
+            subtitle?: string;
+            entityType?: string;
+            legacyId?: string;
+            color?: string;
+          },
+      maybeSubtitle?: string,
+      maybeEntityType?: string,
+      maybeLegacyId?: string,
+      maybeColor?: string
+    ) => {
       if (!canManage || !selectedParentId) return;
 
-      const findLevel = (node: NodeData): number => {
-        if (node.id === selectedParentId) return node.level;
-        for (const child of node.children) {
-          const found = findLevel(child);
-          if (found >= 0) return found;
-        }
-        return -1;
-      };
-      const parentLevel = findLevel(structure);
+      let name = "";
+      let subtitle = "";
+      let entityType = "Unit";
+      let legacyId: string | undefined;
+      let customColor: string | undefined;
+
+      if (typeof nameOrParams === "object") {
+        name = nameOrParams.name;
+        subtitle = nameOrParams.subtitle ?? "";
+        entityType = nameOrParams.entityType ?? "Unit";
+        legacyId = nameOrParams.legacyId;
+        customColor = nameOrParams.color;
+      } else {
+        name = nameOrParams;
+        subtitle = maybeSubtitle ?? "";
+        entityType = maybeEntityType ?? "Unit";
+        legacyId = maybeLegacyId;
+        customColor = maybeColor;
+      }
+
+      const parent = findNode(structure, selectedParentId);
+      const parentLevel = parent ? parent.level : 0;
+
+      let childLevel = parentLevel + 1;
+      let childColor = customColor || LEVEL_COLORS[Math.min(childLevel, LEVEL_COLORS.length - 1)];
+      let childSubtitle = subtitle;
+
+      if (entityType === "Division") {
+        childLevel = 1;
+        childColor = customColor || "#8B5CF6";
+        childSubtitle = subtitle || "Division";
+      } else if (entityType === "Department") {
+        childLevel = parentLevel === 0 ? 1 : 2;
+        childColor = customColor || "#EC4899";
+        childSubtitle = subtitle || "Department";
+      } else if (entityType === "Unit") {
+        childLevel = parentLevel === 1 ? 2 : 3;
+        childColor = customColor || "#0D9488"; // Distinct Teal for Unit
+        childSubtitle = subtitle || "Unit";
+      }
 
       const newNode: NodeData = {
-        id: `node-${Date.now()}`, name, subtitle,
-        color: LEVEL_COLORS[Math.min(parentLevel + 1, LEVEL_COLORS.length - 1)],
-        level: parentLevel + 1,
-        parentId: selectedParentId, children: [],
+        id: legacyId || `node-${Date.now()}`,
+        name,
+        subtitle: childSubtitle,
+        color: childColor,
+        level: childLevel,
+        parentId: selectedParentId,
+        legacyId,
+        children: [],
       };
       const addToTree = (node: NodeData): NodeData =>
         node.id === selectedParentId
@@ -139,7 +257,8 @@ export default function StructureBuilder({ templateId, liveData, liveLoading, ca
       setIsDirty(true);
       setShowAddDialog(false);
       setSelectedParentId(null);
-      toast.success("Node added — click Save to persist");
+      setSelectedParentNode(null);
+      toast.success(`${entityType || "Node"} added to structure — click Save to persist`);
     },
     [canManage, selectedParentId, structure]
   );
@@ -273,7 +392,13 @@ export default function StructureBuilder({ templateId, liveData, liveLoading, ca
       {canManage && (
         <AddNodeDialog
           isOpen={showAddDialog}
-          onClose={() => { setShowAddDialog(false); setSelectedParentId(null); }}
+          parentNode={selectedParentNode}
+          existingNodeNames={existingNodeNames}
+          onClose={() => {
+            setShowAddDialog(false);
+            setSelectedParentId(null);
+            setSelectedParentNode(null);
+          }}
           onAdd={handleAddNode}
         />
       )}

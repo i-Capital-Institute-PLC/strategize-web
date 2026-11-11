@@ -243,9 +243,20 @@ const ObjectiveTable: React.FC<ObjectiveTableProps> = (props) => {
           const groupObjectives = groupedObjectives[groupId];
           const isGroupExpanded =
             groupBy === "none" || expandedGroups[groupId] !== false;
-          const groupName =
-            unitNames[groupId] ||
-            (groupId === "Unassigned" ? "Unassigned" : groupId);
+          let groupName = unitNames[groupId];
+          if (!groupName && groupId.includes("|")) {
+            const [divPart, deptPart] = groupId.split("|");
+            if (divPart === "Other") {
+              groupName = deptPart;
+            } else {
+              const deptName = unitNames[deptPart] || deptPart;
+              const divName = unitNames[divPart];
+              groupName = divName ? `${deptName} (${divName})` : deptName;
+            }
+          }
+          if (!groupName) {
+            groupName = groupId === "Unassigned" ? "Unassigned" : groupId;
+          }
 
           const groupWeight = groupObjectives.reduce((total, obj) => {
             const objKPIs = kpis.filter(
@@ -270,7 +281,7 @@ const ObjectiveTable: React.FC<ObjectiveTableProps> = (props) => {
                           <ChevronDown className="h-4 w-4" />
                         )}
                         <span className="font-bold text-gray-700 dark:text-gray-300 text-sm">
-                          {groupBy.toUpperCase()}: {groupName} (
+                          {(groupBy === "personnel" ? "DEPARTMENT" : groupBy.toUpperCase())}: {groupName} (
                           {groupObjectives.length})
                         </span>
                       </div>

@@ -89,7 +89,7 @@ function useLevelSubmissionQuery(
       limit,
       status: pendingOnly ? "PENDING" : undefined,
     }),
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     skip: !shouldFetch || !enabledLevels.includes(level),
   });

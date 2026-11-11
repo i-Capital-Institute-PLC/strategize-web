@@ -65,6 +65,7 @@ export function useAssignmentActions({
     availableKPIs,
     targets,
     directBasisAllocations,
+    existingAllocationsByKpiId,
     clearAssignments,
     clearSelectedAssignees,
   } = useAssignmentContext();
@@ -114,6 +115,7 @@ export function useAssignmentActions({
         }
       }
 
+      // Multi-session Quota Validation: Direct-basis deliverables
       for (const sourceKpi of availableKPIs) {
         if (sourceKpi.calculationBasisSource !== "DIRECT_VALUE") continue;
         const kpiRecipients = recipients.filter((recipient) =>
@@ -129,13 +131,71 @@ export function useAssignmentActions({
             sourceKpi.directBasisValue || "0",
             100 - retention,
           ) || "0";
-        const allocations = kpiRecipients.map(
-          ({ assigneeId }) =>
-            directBasisAllocations[sourceKpi.kpiId]?.[assigneeId] || "",
+        const maxBasis = Number(cascadeBasis);
+
+        const stagedAssigneeIds = new Set(kpiRecipients.map((r) => r.assigneeId));
+        const otherAllocations = (
+          existingAllocationsByKpiId?.[sourceKpi.kpiId]?.allocations || []
+        ).filter((a) => !stagedAssigneeIds.has(a.assigneeId));
+        const previouslyAllocatedBasis = otherAllocations.reduce(
+          (sum, a) => sum + (Number(a.directBasisValue) || 0),
+          0,
         );
-        if (!decimalValuesEqualTotal(cascadeBasis, allocations)) {
+        const stagedBasis = kpiRecipients.reduce(
+          (sum, { assigneeId }) =>
+            sum + (Number(directBasisAllocations[sourceKpi.kpiId]?.[assigneeId]) || 0),
+          0,
+        );
+        const totalOverallBasis = Math.round((previouslyAllocatedBasis + stagedBasis) * 100) / 100;
+
+        if (totalOverallBasis > maxBasis + 0.01) {
           throw new Error(
-            `Basis allocations for "${sourceKpi.name}" must sum exactly to ${Number(cascadeBasis).toLocaleString()}`,
+            `Total deliverables allocated across all sessions (${totalOverallBasis.toLocaleString()}) cannot exceed the parent quota (${maxBasis.toLocaleString()}) for "${sourceKpi.name}".`,
+          );
+        }
+      }
+
+      // Multi-session Quota Validation: Additive KPIs
+      for (const sourceKpi of availableKPIs) {
+        const isAdditive =
+          sourceKpi.unitType !== "PERCENT" &&
+          sourceKpi.unitType !== "RATIO" &&
+          (sourceKpi.aggregationMethod === "SUM" || !sourceKpi.aggregationMethod);
+        if (!isAdditive) continue;
+
+        const kpiRecipients = recipients.filter((recipient) =>
+          recipient.kpiIds.has(sourceKpi.kpiId),
+        );
+        if (kpiRecipients.length === 0) continue;
+
+        const resolvedParentTarget = resolveAnnualKpiTarget(sourceKpi);
+        const retention =
+          sourceKpi.kpiMode === "HYBRID"
+            ? Number(sourceKpi.managerRetentionPercent || 0)
+            : 0;
+        const cascadeTarget =
+          sourceKpi.kpiMode === "HYBRID"
+            ? Math.round(((resolvedParentTarget * Math.max(0, 100 - retention)) / 100) * 100) / 100
+            : resolvedParentTarget;
+
+        const stagedAssigneeIds = new Set(kpiRecipients.map((r) => r.assigneeId));
+        const otherAllocations = (
+          existingAllocationsByKpiId?.[sourceKpi.kpiId]?.allocations || []
+        ).filter((a) => !stagedAssigneeIds.has(a.assigneeId));
+        const previouslyAllocatedTarget = otherAllocations.reduce(
+          (sum, a) => sum + (Number(a.targetValue) || 0),
+          0,
+        );
+        const stagedTarget = kpiRecipients.reduce(
+          (sum, { assigneeId }) =>
+            sum + (Number(targets[sourceKpi.kpiId]?.[assigneeId]) || 0),
+          0,
+        );
+        const totalOverallTarget = Math.round((previouslyAllocatedTarget + stagedTarget) * 100) / 100;
+
+        if (totalOverallTarget > cascadeTarget + 0.01) {
+          throw new Error(
+            `Total target allocated across all sessions (${totalOverallTarget.toLocaleString()}) cannot exceed the parent goal target (${cascadeTarget.toLocaleString()}) for "${sourceKpi.name}".`,
           );
         }
       }
@@ -174,21 +234,18 @@ export function useAssignmentActions({
               multiplyBasisByPercent(target.value, cascadePercent) || "",
           ),
         );
-        if (!quarterAllocations) {
-          throw new Error(
-            `Quarterly basis allocations for "${sourceKpi.name}" could not be reconciled to its annual basis.`,
-          );
+        if (quarterAllocations) {
+          kpiRecipients.forEach((recipient, index) => {
+            const quarters = quarterAllocations[index];
+            basisTargetsByAllocation.set(
+              `${recipientKey(recipient.assigneeType, recipient.assigneeId)}:${sourceKpi.kpiId}`,
+              parentQuarterTargets.map((target, quarterIndex) => ({
+                timeline: target.timeline,
+                value: quarters[`q${quarterIndex + 1}` as keyof typeof quarters],
+              })),
+            );
+          });
         }
-        kpiRecipients.forEach((recipient, index) => {
-          const quarters = quarterAllocations[index];
-          basisTargetsByAllocation.set(
-            `${recipientKey(recipient.assigneeType, recipient.assigneeId)}:${sourceKpi.kpiId}`,
-            parentQuarterTargets.map((target, quarterIndex) => ({
-              timeline: target.timeline,
-              value: quarters[`q${quarterIndex + 1}` as keyof typeof quarters],
-            })),
-          );
-        });
       }
 
       const recipientInputs = recipients.map((recipient) => ({
@@ -272,15 +329,16 @@ export function useAssignmentActions({
 
       const counts = recipients.reduce<Record<AssigneeType, number>>(
         (totals, recipient) => {
-          totals[recipient.assigneeType] += 1;
+          totals[recipient.assigneeType] = (totals[recipient.assigneeType] || 0) + 1;
           return totals;
         },
-        { DIVISION: 0, DEPARTMENT: 0, PERSONNEL: 0 },
+        { DIVISION: 0, DEPARTMENT: 0, UNIT: 0, PERSONNEL: 0 },
       );
       const cascadeSummary = (
         [
           ["DIVISION", "division"],
           ["DEPARTMENT", "department"],
+          ["UNIT", "unit"],
           ["PERSONNEL", "employee"],
         ] as const
       )

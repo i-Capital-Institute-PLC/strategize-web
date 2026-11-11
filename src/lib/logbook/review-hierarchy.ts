@@ -1,8 +1,10 @@
 export type LogbookReviewDepartment = {
   departmentId?: string;
+  headUserId?: string | null;
   head?: { employeeId?: string | null } | null;
   division?: {
     divisionId?: string;
+    headUserId?: string | null;
     head?: { employeeId?: string | null } | null;
   } | null;
 };
@@ -34,10 +36,19 @@ export function canReviewLogbookOwner(
   const ownerRole = String(owner.role || "").toUpperCase();
 
   if (currentUserRole === 'CEO') {
-    return owner.managerId === currentUser.employeeId && (
-      ownerRole === 'DIRECTOR' || departments.some(
-        (department) => department.head?.employeeId === owner.employeeId,
-      )
+    return (
+      (owner.managerId === currentUser.employeeId && (
+        ownerRole === 'DIRECTOR' || departments.some(
+          (department) => department.head?.employeeId === owner.employeeId,
+        )
+      )) ||
+      (!owner.managerId && (
+        ownerRole === 'DIRECTOR' || departments.some(
+          (department) =>
+            department.head?.employeeId === owner.employeeId &&
+            !department.division,
+        )
+      ))
     );
   }
 
@@ -56,11 +67,14 @@ export function canReviewLogbookOwner(
   if (currentUserRole === "DIRECTOR") {
     return (
       ownerRole === "MANAGER" &&
-      departments.some(
-        (department) =>
-          department.head?.employeeId === owner.employeeId &&
-          department.division?.head?.employeeId === currentUser.employeeId,
-      )
+      departments.some((department) => {
+        const deptHeadId = department.head?.employeeId || department.headUserId;
+        const divHeadId = department.division?.head?.employeeId || department.division?.headUserId;
+        return (
+          deptHeadId === owner.employeeId &&
+          divHeadId === currentUser.employeeId
+        );
+      })
     );
   }
 

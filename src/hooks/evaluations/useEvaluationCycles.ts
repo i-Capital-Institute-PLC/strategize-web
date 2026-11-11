@@ -23,7 +23,7 @@ export const useEvaluationCycles = (
 ) => {
   const { data, loading, error, refetch } = useQuery(GET_EVALUATION_CYCLES, {
     variables: { page, limit, search, status },
-    fetchPolicy: 'cache-first',
+    fetchPolicy: 'cache-and-network',
     nextFetchPolicy: 'cache-first',
   });
 
@@ -40,7 +40,7 @@ export const useEvaluationCycle = (evaluationCycleId: string) => {
   const { data, loading, error, refetch } = useQuery(GET_EVALUATION_CYCLE, {
     variables: { evaluationCycleId },
     skip: !evaluationCycleId,
-    fetchPolicy: 'cache-first',
+    fetchPolicy: 'cache-and-network',
     nextFetchPolicy: 'cache-first',
   });
 

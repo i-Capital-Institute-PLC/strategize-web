@@ -47,7 +47,7 @@ function Monitor({ periodId }: { periodId?: string }) {
     },
     fetchPolicy: "cache-and-network",
   });
-  const entries: Entry[] = data?.logbookEntries?.items || [];
+  const entries: Entry[] = (data?.logbookEntries?.items || []).filter((e: Entry) => e.entryStatus !== "DRAFT");
   const meta = data?.logbookEntries?.meta;
   return (
     <div className="space-y-5">
@@ -73,7 +73,7 @@ function Monitor({ periodId }: { periodId?: string }) {
           setPage(1);
         }}
       >
-        {["ALL", "DRAFT", "SUBMITTED", "APPROVED", "REJECTED"].map((value) => (
+        {["ALL", "SUBMITTED", "APPROVED", "REJECTED"].map((value) => (
           <option key={value}>{value}</option>
         ))}
       </select>

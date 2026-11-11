@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@apollo/client";
 import {
@@ -14,18 +14,23 @@ import {
   Flag,
   Layers3,
   Network,
+  Pencil,
   Scale,
   Target,
   TrendingUp,
+  UserPlus,
   UserRound,
   Users,
 } from "lucide-react";
+import { CreateKpiDialog } from "@/components/kpis/CreateKpiDialog";
+import KpiAssignmentDialog from "@/components/kpis/KpiAssignmentDialog";
 import { GET_KPI, GET_KPI_UPDATES } from "@/lib/graphql/queries/kpis";
 import { GET_KPI_ASSIGNMENT_BREAKDOWN } from "@/lib/graphql/queries/kpi-detail";
 import { GET_KPI_FORMULA_DEFINITIONS } from "@/lib/graphql/queries/kpi-formulas";
 import { GET_EMPLOYEES_BY_ID } from "@/lib/graphql/queries/employees";
 import { GET_DEPARTMENTS_BY_ID } from "@/lib/graphql/queries/departments";
 import { GET_DIVISIONS_BY_ID } from "@/lib/graphql/queries/divisions";
+import { GET_ORGANIZATION } from "@/lib/graphql/queries/organizations";
 import {
   GET_KPI_FORMULA_ANNUAL_ACTUAL,
   GET_KPI_FORMULA_QUARTER_PLANS,
@@ -310,30 +315,46 @@ export default function KpiDetailPage() {
   const router = useRouter();
   const kpiId = params.id as string;
 
-  const { data: kpiData, loading: kpiLoading, error: kpiError } = useQuery(GET_KPI, {
+  const [editOpen, setEditOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+
+  const { data: kpiData, loading: kpiLoading, error: kpiError, refetch: refetchKpi } = useQuery(GET_KPI, {
     variables: { kpiId },
+    fetchPolicy: "cache-and-network",
   });
   const kpi = kpiData?.kpi;
   const strategicPeriodId = kpi?.objective?.strategicPeriod?.strategicPeriodId;
   const organizationId = kpi?.organizationId;
-  const assigneeType = kpi?.assigneeType?.toUpperCase() as
+  const rawAssigneeType = kpi?.assigneeType || kpi?.objective?.assigneeType || kpi?.objective?.type;
+  const assigneeType = rawAssigneeType?.toUpperCase() as
     | DirectAssigneeType
     | undefined;
-  const assigneeId = kpi?.assigneeId;
+  const assigneeId = kpi?.assigneeId || kpi?.objective?.assigneeId;
+  const assignerId =
+    kpi?.assignerId ||
+    kpi?.objective?.createdBy?.employeeId;
   const hasEmployeeOwner =
     assigneeType === "PERSONNEL" || assigneeType === "EMPLOYEE";
 
-  const { data: employeeOwnerData } = useQuery(GET_EMPLOYEES_BY_ID, {
+  const { data: employeeOwnerData, loading: employeeOwnerLoading } = useQuery(GET_EMPLOYEES_BY_ID, {
     variables: { employeeId: assigneeId || "" },
     skip: !hasEmployeeOwner || !assigneeId,
   });
-  const { data: departmentOwnerData } = useQuery(GET_DEPARTMENTS_BY_ID, {
+  const { data: departmentOwnerData, loading: departmentOwnerLoading } = useQuery(GET_DEPARTMENTS_BY_ID, {
     variables: { departmentId: assigneeId || "" },
     skip: assigneeType !== "DEPARTMENT" || !assigneeId,
   });
-  const { data: divisionOwnerData } = useQuery(GET_DIVISIONS_BY_ID, {
+  const { data: divisionOwnerData, loading: divisionOwnerLoading } = useQuery(GET_DIVISIONS_BY_ID, {
     variables: { divisionId: assigneeId || "" },
     skip: assigneeType !== "DIVISION" || !assigneeId,
+  });
+  const { data: assignerData, loading: assignerLoading } = useQuery(GET_EMPLOYEES_BY_ID, {
+    variables: { employeeId: assignerId || "" },
+    skip: !assignerId || assignerId === kpi?.createdBy?.employeeId || assignerId === kpi?.objective?.createdBy?.employeeId,
+  });
+  const { data: orgData, loading: orgLoading, error: orgError } = useQuery(GET_ORGANIZATION, {
+    variables: { organizationId: organizationId || "" },
+    skip: !organizationId,
   });
 
   const { data: updatesData } = useQuery(GET_KPI_UPDATES, {
@@ -395,11 +416,59 @@ export default function KpiDetailPage() {
     [formulaQuarterData],
   );
   const annualFormulaActual = annualFormulaData?.kpiFormulaAnnualActual;
+  const assignerEmployee =
+    assignerId && assignerId === kpi?.createdBy?.employeeId
+      ? kpi.createdBy
+      : (assignerId && kpi?.objective?.createdBy?.employeeId && assignerId === kpi.objective.createdBy.employeeId
+          ? kpi.objective.createdBy
+          : assignerData?.employee);
+
+  const assignerDisplayName = assignerEmployee
+    ? `${assignerEmployee.fullName}${assignerEmployee.title ? ` · ${assignerEmployee.title}` : ""}`
+    : assignerId
+      ? (assignerLoading ? "Loading…" : "Not recorded")
+      : "Not recorded";
+
+  const fallbackAssigneeName = useMemo(() => {
+    if (!assigneeId) return null;
+    const dep = assignmentsData?.departmentAssignments?.items?.find(
+      (d: any) => d.department?.departmentId === assigneeId,
+    );
+    if (dep?.department?.name) return dep.department.name;
+
+    const div = assignmentsData?.divisionAssignments?.items?.find(
+      (d: any) => d.division?.divisionId === assigneeId,
+    );
+    if (div?.division?.name) return div.division.name;
+
+    const emp = assignmentsData?.employeeAssignments?.items?.find(
+      (e: any) => e.employee?.employeeId === assigneeId,
+    );
+    if (emp?.employee?.fullName) return emp.employee.fullName;
+
+    return null;
+  }, [assigneeId, assignmentsData]);
+
+  const isAssigneeLoading =
+    (hasEmployeeOwner && employeeOwnerLoading) ||
+    (assigneeType === "DEPARTMENT" && departmentOwnerLoading) ||
+    (assigneeType === "DIVISION" && divisionOwnerLoading);
+
   const directOwnerName =
     employeeOwnerData?.employee?.fullName ||
     departmentOwnerData?.department?.name ||
     divisionOwnerData?.division?.name ||
+    fallbackAssigneeName ||
     (assigneeType === "CORPORATE" ? "Organization" : null);
+
+  const declaredAssigneeDisplay =
+    directOwnerName ||
+    (assigneeId ? (isAssigneeLoading ? "Loading…" : "Not recorded") : "Not directly assigned");
+
+  const organizationName =
+    orgData?.organization?.name ||
+    assignmentsData?.corporateAssignments?.items?.[0]?.organization?.name ||
+    (organizationId ? (orgLoading ? "Loading…" : "Not recorded") : "Not recorded");
 
   const assignments = useMemo(() => {
     const rows: AssignmentRow[] = [];
@@ -495,16 +564,15 @@ export default function KpiDetailPage() {
           source: "Direct owner",
           icon: directOwnerConfig.icon,
           name: directOwnerName || "Assigned organizational unit",
-          detail: "Ownership is stored directly on this KPI",
+          detail: kpi.assigneeId
+            ? "Ownership is stored directly on this KPI"
+            : "Inherited from objective",
           targetValue: kpi.targetValue,
           weight: kpi.weight,
           parentWeightAllocation: null,
           cap: null,
           createdAt: kpi.createdAt,
-          assignedBy:
-            kpi.assignerId && kpi.assignerId === kpi.createdBy?.employeeId
-              ? kpi.createdBy
-              : null,
+          assignedBy: assignerEmployee || null,
           strategicPeriod: kpi.objective?.strategicPeriod,
         });
       }
@@ -518,6 +586,7 @@ export default function KpiDetailPage() {
     directOwnerName,
     hasEmployeeOwner,
     kpi,
+    assignerEmployee,
   ]);
 
   const quarters = useMemo(
@@ -627,6 +696,25 @@ export default function KpiDetailPage() {
               </div>
             </div>
 
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-[#3838EC] hover:bg-[#2e2ed1] text-white"
+                onClick={() => setAssignOpen(true)}
+              >
+                <UserPlus className="h-4 w-4" />
+                Assign
+              </Button>
+            </div>
           </div>
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
@@ -721,10 +809,9 @@ export default function KpiDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <DetailItem label="Declared assignee type" value={labelize(kpi.assigneeType)} />
-            <DetailItem label="Direct owner" value={declaredOwner || "Not directly assigned"} />
-            <DetailItem label="Declared assignee ID" value={kpi.assigneeId ? <span className="font-mono text-xs">{kpi.assigneeId}</span> : "Not recorded"} />
-            <DetailItem label="Assigner ID" value={kpi.assignerId || "Not recorded"} />
+            <DetailItem label="Declared assignee type" value={labelize(assigneeType)} />
+            <DetailItem label="Declared assignee" value={declaredAssigneeDisplay} />
+            <DetailItem label="Assigned by" value={assignerDisplayName} />
             <DetailItem
               label="Created by"
               value={
@@ -850,7 +937,7 @@ export default function KpiDetailPage() {
                     <DetailItem label="Carry-in" value={formatValue(plan?.carryIn, unit.short)} />
                     <DetailItem label="Effective target" value={formatValue(plan?.effectiveTarget, unit.short)} />
                     <DetailItem label="Actual" value={formatValue(result?.finalActual, unit.short)} />
-                    <DetailItem label="Achievement" value={result?.finalAchievementRate == null ? "—" : `${formatNumber(result.finalAchievementRate)}%`} />
+                    <DetailItem label="Achievement" value={result?.finalAchievementRate == null ? "—" : `${formatNumber(Number(result.finalAchievementRate) * 100)}%`} />
                     <DetailItem label="Calculation" value={labelize(result?.calculationMode || kpi.calculationType)} />
                   </div>
                   {plan?.directBasisTarget != null && (
@@ -1042,8 +1129,8 @@ export default function KpiDetailPage() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Database className="h-5 w-5 text-slate-600" />Record metadata</CardTitle></CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
-              <DetailItem label="KPI ID" value={<span className="font-mono text-xs">{kpi.kpiId}</span>} />
-              <DetailItem label="Organization ID" value={<span className="font-mono text-xs">{kpi.organizationId}</span>} />
+              <DetailItem label="KPI" value={<span title={`KPI ID: ${kpi.kpiId}`}>{kpi.name}</span>} />
+              <DetailItem label="Organization" value={<span title={`Organization ID: ${kpi.organizationId}`}>{organizationName}</span>} />
               <DetailItem label="Created" value={formatDate(kpi.createdAt)} />
               <DetailItem label="Last updated" value={formatDate(kpi.updatedAt)} />
               <DetailItem label="Formula definitions" value={formulaDefinitions.length} />
@@ -1054,6 +1141,38 @@ export default function KpiDetailPage() {
           </Card>
         )}
       </div>
+
+      {editOpen && (
+        <CreateKpiDialog
+          open={editOpen}
+          onOpenChange={(open: boolean) => {
+            setEditOpen(open);
+            if (!open) refetchKpi();
+          }}
+          organizationId={organizationId || ""}
+          editKpi={kpi as any}
+        />
+      )}
+
+      {assignOpen && strategicPeriodId && (
+        <KpiAssignmentDialog
+          kpi={{
+            kpiId: kpi.kpiId,
+            name: kpi.name,
+            targetValue: kpi.targetValue,
+            measurementUnit: kpi.measurementUnit,
+            unitType: kpi.unitType,
+            calculationBasisSource: kpi.calculationBasisSource,
+          }}
+          strategicPeriodId={strategicPeriodId}
+          onSuccess={() => {
+            setAssignOpen(false);
+            refetchKpi();
+          }}
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+        />
+      )}
     </div>
   );
 }

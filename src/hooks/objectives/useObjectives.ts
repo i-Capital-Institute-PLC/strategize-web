@@ -17,7 +17,10 @@ import {
   usesPersonalObjectiveScope,
 } from "@/lib/objectives/personalObjectiveScope";
 
-export const useObjectives = (variables: ObjectivesQueryVariables = {}) => {
+export const useObjectives = (
+  variables: ObjectivesQueryVariables = {},
+  options: { skip?: boolean } = {},
+) => {
   const user = useAuthStore((state) => state.user);
   const personalOnly = usesPersonalObjectiveScope(user?.role);
   const queryVariables = {
@@ -34,8 +37,8 @@ export const useObjectives = (variables: ObjectivesQueryVariables = {}) => {
     ObjectivesQueryVariables
   >(GET_OBJECTIVES, {
     variables: queryVariables,
-    skip: !user?.employeeId,
-    fetchPolicy: personalOnly ? "cache-and-network" : "cache-first",
+    skip: !user?.employeeId || Boolean(options.skip),
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     notifyOnNetworkStatusChange: true,
     // Keep showing cached rows while a background refresh runs.

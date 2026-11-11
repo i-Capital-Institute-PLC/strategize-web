@@ -177,6 +177,17 @@ export const useAuth = ({ bootstrap = false }: UseAuthOptions = {}) => {
 
         const employee = data.loginEmployee.employee;
 
+        if (typeof window !== "undefined") {
+          const storedUserId = window.localStorage.getItem("strategize-cache-user-id");
+          if (storedUserId && storedUserId !== employee.employeeId) {
+            authLogger.info("Different user login detected, purging previous user Apollo cache");
+            window.localStorage.removeItem("strategize-apollo-cache-v2");
+            window.localStorage.removeItem("strategize-cache-timestamp");
+          }
+          window.localStorage.setItem("strategize-cache-user-id", employee.employeeId);
+          window.localStorage.setItem("strategize-cache-timestamp", Date.now().toString());
+        }
+
         useAuthStore.getState().login(employee, token);
         setTokenExpiresIn(getTokenExpiryDisplay(token));
 
@@ -236,6 +247,8 @@ export const useAuth = ({ bootstrap = false }: UseAuthOptions = {}) => {
       await apolloClient.clearStore();
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem("strategize-apollo-cache");
+        window.localStorage.removeItem("strategize-cache-user-id");
+        window.localStorage.removeItem("strategize-cache-timestamp");
         // Call the global cache clearing function if available
         if (typeof (window as any).__clearApolloCache === "function") {
           await (window as any).__clearApolloCache();

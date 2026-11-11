@@ -717,16 +717,11 @@ export function useUpdateKPIState({
       ].map(Number);
       const isRateLike =
         formData.unitType === "PERCENT" || formData.unitType === "RATIO";
-      if (isRateLike) {
-        if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
-          throw new Error(
-            "Every quarter must have a percentage/rate value greater than zero",
-          );
-        }
-      } else {
-        if (values.some((value) => !Number.isFinite(value) || value < 0)) {
-          throw new Error("Quarterly values cannot be negative");
-        }
+      if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+        throw new Error("Quarterly values cannot be negative");
+      }
+      if (values.every((value) => value === 0)) {
+        throw new Error("At least one quarter must have a target value greater than zero");
       }
       const annualValue =
         !isSupport && kpi.assignedTargetValue && kpi.assignedTargetValue > 0
@@ -736,8 +731,11 @@ export function useUpdateKPIState({
             : Number(annualTarget);
       const total = values.reduce((sum, value) => sum + value, 0);
       const averageBased =
-        formData.quarterlyAggregationMethod === "AVERAGE";
-      const plannedAnnual = averageBased ? total / values.length : total;
+        formData.quarterlyAggregationMethod === "AVERAGE" ||
+        (!formData.quarterlyAggregationMethod && isRateLike);
+      const activeCount = values.filter((val) => val > 0).length;
+      const divisor = activeCount > 0 ? activeCount : 1;
+      const plannedAnnual = averageBased ? total / divisor : total;
       const isFormulaKpi =
         kpi.calculationType === "RATIO_FORMULA" ||
         kpi.calculationType === "SCALAR_FORMULA" ||

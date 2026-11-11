@@ -108,12 +108,13 @@ export const useKpis = (
     search?: string;
     organizationId?: string;
     strategicObjectiveId?: string;
+    assigneeId?: string;
   } = {},
 ) => {
   const { page = 1, limit = 20, ...rest } = variables;
   const { data, loading, error, refetch } = useQuery(GET_KPIS, {
     variables: { page, limit, ...rest },
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
 
@@ -130,7 +131,7 @@ export const useKpi = (kpiId: string) => {
   const { data, loading, error, refetch } = useQuery(GET_KPI, {
     variables: { kpiId },
     skip: !kpiId,
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
 

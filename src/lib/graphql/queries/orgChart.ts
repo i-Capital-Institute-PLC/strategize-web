@@ -4,6 +4,7 @@ export const GET_ORG_CHART = gql`
   query GetOrgChart($organizationId: ID!) {
     getOrgChart(organizationId: $organizationId) {
       id
+      legacyId
       name
       subtitle
       color
@@ -24,6 +25,7 @@ export const GET_ORG_CHART = gql`
       }
       children {
         id
+        legacyId
         name
         subtitle
         color
@@ -44,6 +46,7 @@ export const GET_ORG_CHART = gql`
         }
         children {
           id
+          legacyId
           name
           subtitle
           color
@@ -58,6 +61,7 @@ export const GET_ORG_CHART = gql`
           }
           children {
             id
+            legacyId
             name
             subtitle
             color
@@ -71,6 +75,7 @@ export const GET_ORG_CHART = gql`
             }
             children {
               id
+              legacyId
               name
               subtitle
               color
@@ -84,6 +89,7 @@ export const GET_ORG_CHART = gql`
               }
               children {
                 id
+                legacyId
                 name
                 subtitle
                 color
@@ -95,7 +101,7 @@ export const GET_ORG_CHART = gql`
                   title
                   picture
                 }
-                children { id name subtitle color level parentId children { id name color level children { id name color level children { id name color level } } } }
+                children { id legacyId name subtitle color level parentId children { id legacyId name color level children { id legacyId name color level children { id legacyId name color level } } } }
               }
             }
           }

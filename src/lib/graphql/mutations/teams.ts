@@ -10,6 +10,10 @@ export const CREATE_TEAM = gql`
       name
       description
       isActive
+      division {
+        divisionId
+        name
+      }
       department {
         departmentId
         name
@@ -30,6 +34,10 @@ export const UPDATE_TEAM = gql`
       name
       description
       isActive
+      division {
+        divisionId
+        name
+      }
       department {
         departmentId
         name

@@ -257,7 +257,7 @@ const KPITableRow: React.FC<KPITableRowProps> = ({
       )}
 
       <TableCell
-        className="px-6 py-4 w-16"
+        className="px-6 py-4 w-16 sticky right-0 bg-background/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]"
         onClick={(e) => e.stopPropagation()}
       >
         <KPIActions

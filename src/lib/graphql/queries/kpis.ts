@@ -13,6 +13,7 @@ export const GET_KPIS = gql`
     $search: String
     $organizationId: ID
     $strategicObjectiveId: ID
+    $assigneeId: ID
   ) {
     kpis(
       page: $page
@@ -20,6 +21,7 @@ export const GET_KPIS = gql`
       search: $search
       organizationId: $organizationId
       strategicObjectiveId: $strategicObjectiveId
+      assigneeId: $assigneeId
     ) {
       items {
         kpiId
@@ -110,6 +112,19 @@ export const GET_KPIS = gql`
           status
           version
         }
+        quarterResults {
+          kpiQuarterResultId
+          quarterPlanId
+          calculationMode
+          calculationStatus
+          finalActual
+          finalAchievementRate
+          rollupNumeratorExact
+          rollupDenominatorExact
+          status
+          calculatedAt
+          finalizedAt
+        }
         latestUpdate {
           kpiUpdateId
           achievedValue
@@ -196,6 +211,12 @@ export const GET_KPI = gql`
         cascadeType
         assigneeType
         assigneeId
+        createdBy {
+          employeeId
+          fullName
+          email
+          title
+        }
         parent {
           objectiveId
         }
@@ -281,6 +302,7 @@ export const GET_KPIS_BY_OBJECTIVE = gql`
         quarterlyAggregationMethod
         customUnitLabel
         targetValue
+        assignedTargetValue
         baselineValue
         weight
         frequency
@@ -325,6 +347,19 @@ export const GET_KPIS_BY_OBJECTIVE = gql`
           status
           version
         }
+        quarterResults {
+          kpiQuarterResultId
+          quarterPlanId
+          calculationMode
+          calculationStatus
+          finalActual
+          finalAchievementRate
+          rollupNumeratorExact
+          rollupDenominatorExact
+          status
+          calculatedAt
+          finalizedAt
+        }
       }
       meta {
         currentPage
@@ -365,6 +400,7 @@ export const GET_MY_KPIS = gql`
         quarterlyAggregationMethod
         customUnitLabel
         targetValue
+        assignedTargetValue
         baselineValue
         weight
         frequency
@@ -419,6 +455,19 @@ export const GET_MY_KPIS = gql`
         directBasisTarget
           status
           version
+        }
+        quarterResults {
+          kpiQuarterResultId
+          quarterPlanId
+          calculationMode
+          calculationStatus
+          finalActual
+          finalAchievementRate
+          rollupNumeratorExact
+          rollupDenominatorExact
+          status
+          calculatedAt
+          finalizedAt
         }
         latestUpdate {
           kpiUpdateId

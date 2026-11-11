@@ -119,6 +119,8 @@ export function removeCheckinTask(
     checkinoutTaskId: taskId,
   });
   if (taskCacheId) cache.evict({ id: taskCacheId });
+  cache.evict({ id: "ROOT_QUERY", fieldName: "checkinoutTasks" });
+  cache.gc();
   invalidateCheckinDerivedFields(cache, sessionId);
 }
 

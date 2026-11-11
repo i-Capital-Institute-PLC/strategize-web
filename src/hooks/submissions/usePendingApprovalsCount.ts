@@ -4,7 +4,7 @@
  * so the dashboard shell stays fast without changing approval workflows.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@apollo/client";
 import { useAuthStore, useOrgUnitStore } from "@/stores";
 import { usePermissions } from "@/hooks/permissions/usePermissions";
@@ -77,6 +77,7 @@ function useLightLevelQuery(
   enabledLevels: ObjectiveType[],
   shouldFetch: boolean,
   submissionType: "OBJECTIVE" | "KPI",
+  pollInterval = 0,
 ) {
   const buildVars =
     submissionType === "OBJECTIVE"
@@ -88,9 +89,10 @@ function useLightLevelQuery(
       limit: BADGE_LIMIT,
       status: "PENDING",
     }),
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     skip: !shouldFetch || !enabledLevels.includes(level),
+    pollInterval,
   });
 }
 
@@ -114,41 +116,64 @@ export function usePendingApprovalsCount(): PendingApprovalsCount {
         selectedUnit),
   );
 
+  const [isVisible, setIsVisible] = useState(() =>
+    typeof document !== "undefined" ? document.visibilityState === "visible" : true,
+  );
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleVisibility = () => {
+      setIsVisible(document.visibilityState === "visible");
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  const activePollInterval = isVisible ? 90_000 : 0;
+
   const divisionObj = useLightLevelQuery(
     "DIVISION",
     enabledLevels,
     shouldMakeQueries,
     "OBJECTIVE",
+    activePollInterval,
   );
   const departmentObj = useLightLevelQuery(
     "DEPARTMENT",
     enabledLevels,
     shouldMakeQueries,
     "OBJECTIVE",
+    activePollInterval,
   );
   const personnelObj = useLightLevelQuery(
     "PERSONNEL",
     enabledLevels,
     shouldMakeQueries,
     "OBJECTIVE",
+    activePollInterval,
   );
   const divisionKpi = useLightLevelQuery(
     "DIVISION",
     enabledLevels,
     shouldMakeQueries,
     "KPI",
+    activePollInterval,
   );
   const departmentKpi = useLightLevelQuery(
     "DEPARTMENT",
     enabledLevels,
     shouldMakeQueries,
     "KPI",
+    activePollInterval,
   );
   const personnelKpi = useLightLevelQuery(
     "PERSONNEL",
     enabledLevels,
     shouldMakeQueries,
     "KPI",
+    activePollInterval,
   );
 
   const allSubmissions = useMemo(
@@ -270,9 +295,9 @@ export function usePendingApprovalsCount(): PendingApprovalsCount {
         page: 1,
       },
       skip: !user?.employeeId,
-      fetchPolicy: "cache-first",
+      fetchPolicy: "cache-and-network",
       nextFetchPolicy: "cache-first",
-      pollInterval: 120_000,
+      pollInterval: activePollInterval,
     },
   );
 

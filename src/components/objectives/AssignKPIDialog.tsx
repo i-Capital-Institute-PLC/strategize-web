@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
     Dialog,
     DialogContent,
@@ -9,7 +9,13 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog";
 import { Handshake, Target, Users } from "lucide-react";
-import { AssignmentProvider } from "@/context/AssignmentContext";
+import { useQuery } from "@apollo/client";
+import { GET_KPIS } from "@/lib/graphql/queries/kpis";
+import {
+    AssignmentProvider,
+    type ExistingAllocation,
+    type ExistingKpiAllocations,
+} from "@/context/AssignmentContext";
 import type { Objective, Kpi } from "@/types/graphql";
 import { AssignObjectiveContent } from "./assign-dialog";
 import { SupportAssignmentForm } from "./support-assignment";
@@ -39,11 +45,46 @@ export default function AssignKPIDialog({
         ? contributionType
         : "SUPPORT";
 
+    // We need the objective because children are created under it
+    const objective = kpi?.objective as Objective | undefined;
+    const organizationId = (objective as any)?.organizationId;
+
+    const { data: allKpisData } = useQuery(GET_KPIS, {
+        variables: {
+            organizationId,
+            limit: 1000,
+        },
+        skip: !open || !organizationId,
+        fetchPolicy: "network-only",
+    });
+
+    const existingAllocations = useMemo(() => {
+        if (!open || !kpi) return {};
+        const map: Record<string, ExistingKpiAllocations> = {};
+        const items = allKpisData?.kpis?.items || [];
+        const children = items.filter(
+            (item: any) => item.parent?.kpiId === kpi?.kpiId && !item.isDeleted,
+        );
+        const allocations: ExistingAllocation[] = children.map((c: any) => ({
+            assigneeId: c.assigneeId,
+            assigneeType: c.assigneeType,
+            assigneeName: c.createdBy?.fullName || c.name || "Assigned",
+            targetValue: Number(c.assignedTargetValue ?? c.targetValue ?? 0),
+            directBasisValue: c.directBasisValue || undefined,
+        }));
+        map[kpi.kpiId] = {
+            totalTarget: allocations.reduce((sum, a) => sum + a.targetValue, 0),
+            totalBasis: allocations.reduce(
+                (sum, a) => sum + (Number(a.directBasisValue) || 0),
+                0,
+            ),
+            allocations,
+        };
+        return map;
+    }, [allKpisData, kpi, open]);
+
     // If dialog is not open, don't render content
     if (!open) return null;
-
-    // We need the objective because children are created under it
-    const objective = kpi.objective as Objective;
 
     if (!objective) {
         console.error("KPI has no associated objective for assignment", kpi);
@@ -100,12 +141,13 @@ export default function AssignKPIDialog({
                                     </span>
                                 </span>
                             </Label>
+
                             <Label
                                 htmlFor="support"
-                                className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 hover:bg-muted/50 has-[[data-state=checked]]:border-purple-500 has-[[data-state=checked]]:bg-purple-50"
+                                className="flex items-start gap-3 rounded-lg border p-4 has-[[data-state=checked]]:border-amber-500 has-[[data-state=checked]]:bg-amber-50 cursor-pointer hover:bg-muted/50"
                             >
                                 <RadioGroupItem id="support" value="SUPPORT" className="mt-1" />
-                                <Handshake className="mt-0.5 h-5 w-5 text-purple-600" />
+                                <Handshake className="mt-0.5 h-5 w-5 text-amber-600" />
                                 <span>
                                     <span className="block font-semibold">Support</span>
                                     <span className="text-sm font-normal text-muted-foreground">Request contribution without allocating the corporate target or weight.</span>
@@ -124,7 +166,11 @@ export default function AssignKPIDialog({
                     />
                 ) : (
                     /* We pass ONLY this KPI to the provider so it's the only one selectable */
-                    <AssignmentProvider objective={objective} kpis={[kpi]}>
+                    <AssignmentProvider
+                        objective={objective}
+                        kpis={[kpi]}
+                        existingAllocations={existingAllocations}
+                    >
                         <AssignObjectiveContent onSuccess={onSuccess} onClose={() => onOpenChange(false)} />
                     </AssignmentProvider>
                 )}

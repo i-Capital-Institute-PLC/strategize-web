@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useKpis } from "@/hooks/kpis/useKpis";
 import { KpisTable, CreateKpiDialog } from "@/components/kpis";
+import SyncButton from "@/components/shared/SyncButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Search, Target } from "lucide-react";
-import { useAuthStore } from "@/stores";
+import { useAuthStore, useOrgUnitStore } from "@/stores";
+import { Badge } from "@/components/ui/badge";
 
 export default function KpisPage() {
   const [search, setSearch] = useState("");
@@ -21,14 +23,60 @@ export default function KpisPage() {
   const [showCreate, setShowCreate] = useState(false);
 
   const user = useAuthStore((state) => state.user);
+  const selectedUnit = useOrgUnitStore((state) => state.selectedUnit);
   const organizationId = user?.organizationId || "";
 
-  const { kpis, loading } = useKpis({
+  const isGlobalRole = ["SUPER_ADMIN", "ADMIN", "CEO"].includes(user?.role || "");
+
+  const primaryDepartment = user?.departments?.[0] as
+    | {
+        departmentId: string;
+        name?: string;
+        division?: { divisionId: string; name?: string } | null;
+      }
+    | undefined;
+
+  const fallbackUnit =
+    user?.role === "DIRECTOR" && primaryDepartment?.division?.divisionId
+      ? {
+          id: primaryDepartment.division.divisionId,
+          type: "division" as const,
+          name: primaryDepartment.division.name,
+        }
+      : (user?.role === "MANAGER" || user?.role === "COORDINATOR") &&
+          primaryDepartment?.departmentId
+        ? {
+            id: primaryDepartment.departmentId,
+            type: "department" as const,
+            name: primaryDepartment.name,
+          }
+        : null;
+
+  const effectiveUnit = selectedUnit || fallbackUnit;
+
+  const assigneeId = !isGlobalRole
+    ? user?.role === "NORMAL"
+      ? user?.employeeId
+      : effectiveUnit?.id
+    : selectedUnit?.id || undefined;
+
+  const scopeLabel = !isGlobalRole
+    ? effectiveUnit?.name || primaryDepartment?.name || user?.fullName
+    : selectedUnit
+      ? `Filtered by ${selectedUnit.type}`
+      : "All Organization";
+
+  const { kpis, loading, refetch } = useKpis({
     page: 1,
     limit: 100,
     search: search || undefined,
     organizationId: organizationId || undefined,
+    assigneeId: assigneeId || undefined,
   });
+
+  const handleSyncKpis = async () => {
+    await refetch();
+  };
 
   // Filter by type client-side (backend doesn't support type filter yet)
   const filteredKpis = typeFilter
@@ -45,18 +93,28 @@ export default function KpisPage() {
               <Target className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-                KPIs
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  KPIs
+                </h1>
+                {scopeLabel && (
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    {scopeLabel}
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
                 Manage Key Performance Indicators and track progress
               </p>
             </div>
           </div>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> New KPI
-        </Button>
+        <div className="flex items-center gap-2">
+          <SyncButton onSync={handleSyncKpis} label="Sync" />
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> New KPI
+          </Button>
+        </div>
       </div>
 
       {/* Stats row */}

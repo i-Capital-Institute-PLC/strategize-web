@@ -98,7 +98,11 @@ const ObjectiveTableRow: React.FC<ObjectiveTableRowProps> = ({
         if (objective.type === "CORPORATE") return null;
         if (objective.parent) {
             const parent = allObjectives.find(o => o.objectiveId === objective.parent?.objectiveId);
-            if (parent) return `From: ${parent.type.charAt(0) + parent.type.slice(1).toLowerCase()}`;
+            if (parent) {
+                const parentUnit = parent.assigneeId ? unitNames[parent.assigneeId] : null;
+                const parentType = parent.type.charAt(0) + parent.type.slice(1).toLowerCase();
+                return parentUnit ? `From: ${parentUnit} (${parentType})` : `From: ${parentType}`;
+            }
         }
         return null;
     };
@@ -213,7 +217,7 @@ const ObjectiveTableRow: React.FC<ObjectiveTableRowProps> = ({
                 {new Date(objective.createdAt).toLocaleDateString()}
             </TableCell>
 
-            <TableCell className="px-6 py-4 text-gray-600" onClick={(e) => e.stopPropagation()}>
+            <TableCell className="px-6 py-4 text-gray-600 sticky right-0 bg-background/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-2">
                     {onViewObjective && (
                         <Button

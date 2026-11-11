@@ -206,24 +206,22 @@ export function useCreateKPIForm({
 
         const isRateLike =
           formData.unitType === "PERCENT" || formData.unitType === "RATIO";
-        if (isRateLike) {
-          if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
-            throw new Error(
-              "Every quarter must have a percentage/rate value greater than zero",
-            );
-          }
-        } else {
-          if (values.some((value) => !Number.isFinite(value) || value < 0)) {
-            throw new Error("Quarterly values cannot be negative");
-          }
+        if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+          throw new Error("Quarterly values cannot be negative");
+        }
+        if (values.every((value) => value === 0)) {
+          throw new Error("At least one quarter must have a target value greater than zero");
         }
 
         const sum = q1 + q2 + q3 + q4;
 
         const TOLERANCE = 0.01;
         const shouldAverage =
-          formData.quarterlyAggregationMethod === "AVERAGE";
-        const plannedVal = shouldAverage ? sum / values.length : sum;
+          formData.quarterlyAggregationMethod === "AVERAGE" ||
+          (!formData.quarterlyAggregationMethod && isRateLike);
+        const activeCount = values.filter((val) => val > 0).length;
+        const divisor = activeCount > 0 ? activeCount : 1;
+        const plannedVal = shouldAverage ? sum / divisor : sum;
         if (Math.abs(plannedVal - annualValue) > TOLERANCE) {
           throw new Error(
             `Quarterly ${shouldAverage ? "average" : "sum"} (${plannedVal.toFixed(2)}) must equal the annual target (${annualValue})`,

@@ -152,7 +152,7 @@ export const useAnalytics = (
   });
 
   // Only fetch global KPIs when no unit is selected (for admin analytics)
-  // When a unit is selected, we count KPIs from the objectives data
+  // When a unit is selected or for non-global-admin roles, we count KPIs from the objectives data
   const {
     data: kpisData,
     loading: kpisLoading,
@@ -162,7 +162,7 @@ export const useAnalytics = (
     fetchPolicy: "cache-first",
     nextFetchPolicy: "cache-first",
     notifyOnNetworkStatusChange: true,
-    skip: !contextReady || !!selectedUnit, // Skip when a specific unit is selected
+    skip: !contextReady || !canAccessGlobalData || !!selectedUnit, // Skip when a specific unit is selected or not global admin
   });
 
   const {
@@ -174,7 +174,7 @@ export const useAnalytics = (
     fetchPolicy: "cache-first",
     nextFetchPolicy: "cache-first",
     notifyOnNetworkStatusChange: true,
-    skip: !contextReady,
+    skip: !contextReady || !canAccessGlobalData, // Skip when not global admin
   });
 
   // Scoped queries for Directors/Managers who can't access global data
@@ -331,9 +331,9 @@ export const useAnalytics = (
       objectivesData?.objectives?.items || []
     );
 
-    // Calculate KPIs growth - use KPIs from objectives when unit is selected
+    // Calculate KPIs growth - use KPIs from objectives when unit is selected or for non-global-admin roles
     let kpisForGrowth: ItemWithDateFields[] = [];
-    if (selectedUnit) {
+    if (selectedUnit || !canAccessGlobalData) {
       const objectives = objectivesData?.objectives?.items || [];
       objectives.forEach((obj) => {
         if (obj.kpis) {
@@ -374,23 +374,21 @@ export const useAnalytics = (
     const kpisAreLoading = contextLoading || kpisLoading;
     const loading =
       contextLoading ||
-      divisionsLoading ||
-      departmentsLoading ||
-      employeesLoading ||
+      (canAccessGlobalData && (divisionsLoading || departmentsLoading || employeesLoading || initiativesLoading)) ||
       objectivesLoading ||
-      kpisLoading ||
-      initiativesLoading ||
-      scopedDivisionLoading ||
-      scopedDepartmentLoading;
+      (!selectedUnit && canAccessGlobalData && kpisLoading) ||
+      (selectedUnit?.type === "division" && scopedDivisionLoading) ||
+      (selectedUnit?.type === "department" && scopedDepartmentLoading);
     const error =
-      divisionsError?.message ||
-      departmentsError?.message ||
-      employeesError?.message ||
       objectivesError?.message ||
-      kpisError?.message ||
-      initiativesError?.message ||
-      scopedDivisionError?.message ||
-      scopedDepartmentError?.message ||
+      (canAccessGlobalData &&
+        (divisionsError?.message ||
+          departmentsError?.message ||
+          employeesError?.message ||
+          initiativesError?.message ||
+          (!selectedUnit && kpisError?.message))) ||
+      (selectedUnit?.type === "division" && scopedDivisionError?.message) ||
+      (selectedUnit?.type === "department" && scopedDepartmentError?.message) ||
       null;
 
     const initiativesCount = (initiativesData as any)?.initiatives?.meta?.totalItems || (initiativesData as any)?.initiatives?.items?.length || 0;

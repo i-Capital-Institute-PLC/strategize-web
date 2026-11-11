@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
-import { gql, useQuery } from "@apollo/client";
+import { gql, useQuery, useApolloClient } from "@apollo/client";
+import { SyncButton } from "@/components/shared/SyncButton";
 import {
   GET_LOGBOOK_ENTRIES,
   GET_LOGBOOK_FORMULA_FOR_CONTEXT,
@@ -70,11 +71,13 @@ const GET_LOGBOOK_REVIEW_DEPARTMENTS = gql`
     departments(page: $page, limit: $limit) {
       items {
         departmentId
+        headUserId
         head {
           employeeId
         }
         division {
           divisionId
+          headUserId
           head {
             employeeId
           }
@@ -102,6 +105,14 @@ type LogbookReviewEntry = {
   evidenceDescription?: string | null;
   evidenceUrl?: string | null;
   evidenceItems?: LogbookEvidence[] | null;
+  evidenceApprovalRequired?: boolean | null;
+  evidenceApprovalStatus?: string | null;
+  evidenceApproverId?: string | null;
+  evidenceApprover?: {
+    employeeId?: string | null;
+    fullName?: string | null;
+    title?: string | null;
+  } | null;
   decisionsMade?: string | null;
   lessonsLearned?: string | null;
   risksIssues?: string | null;
@@ -150,6 +161,25 @@ export default function ApprovalsPage() {
     useState<LogbookReviewEntry | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
 
+  const apolloClient = useApolloClient();
+
+  const handleSyncApprovals = async () => {
+    await Promise.allSettled([
+      refetchLogbook?.(),
+      apolloClient.refetchQueries({
+        include: [
+          "GetPendingSubmissions",
+          "GetKpiSubmissions",
+          "GetSubmissionsByStatus",
+          "GetPendingSubmissionsLight",
+          "GetLogbookEntries",
+          "GetLogbookPendingBadge",
+          "GetLogbookReviewDepartments",
+        ],
+      }),
+    ]);
+  };
+
   // Get logbook entries for approval
   // The server enforces the approver's hierarchy; UI checks are an additional safeguard.
   const { data: departmentsData, loading: departmentsLoading } = useQuery(
@@ -157,6 +187,8 @@ export default function ApprovalsPage() {
     {
       variables: { page: 1, limit: 1000 },
       skip: !user?.employeeId || user.role === 'CEO',
+      fetchPolicy: "cache-and-network",
+      nextFetchPolicy: "cache-first",
     },
   );
 
@@ -176,6 +208,8 @@ export default function ApprovalsPage() {
       page: user?.role === 'CEO' ? logbookPage : 1,
     },
     skip: !user?.employeeId,
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
   });
 
   const selectedEntryIsFormula = isLogbookFormulaCalculationType(
@@ -217,9 +251,12 @@ export default function ApprovalsPage() {
   );
   const logbookEntries = useMemo(
     () =>
-      user?.role === 'CEO' ? rawLogbookEntries : rawLogbookEntries.filter((entry) =>
-        canReviewLogbookOwner(entry.owner, user, reviewDepartments),
-      ),
+      (user?.role === 'CEO'
+        ? rawLogbookEntries
+        : rawLogbookEntries.filter((entry) =>
+            canReviewLogbookOwner(entry.owner, user, reviewDepartments),
+          )
+      ).filter((entry) => String(entry.entryStatus || "").toUpperCase() !== "DRAFT"), // Managers must never see draft logbook entries
     [rawLogbookEntries, user, reviewDepartments],
   );
 
@@ -325,10 +362,12 @@ export default function ApprovalsPage() {
                     ? "Approve Requests"
                     : "Approval Requests"}
               </h1>
-              {(guards.isAdmin || guards.isSuperAdmin) && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/dashboard/approvals/config")}
+              <div className="flex flex-wrap items-center gap-2">
+                <SyncButton onSync={handleSyncApprovals} label="Sync Approvals" />
+                {(guards.isAdmin || guards.isSuperAdmin) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push("/dashboard/approvals/config")}
                   className="w-full gap-2 sm:w-auto"
                 >
                   <svg
@@ -351,8 +390,9 @@ export default function ApprovalsPage() {
                     />
                   </svg>
                   Configure Workflow
-                </Button>
-              )}
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="text-gray-600">
               {isViewingOwnSubmissions
@@ -490,8 +530,7 @@ export default function ApprovalsPage() {
                       <SelectItem value="submitted">Pending</SelectItem>
                       <SelectItem value="approved">Approved</SelectItem>
                       <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                    </SelectContent>
+                      </SelectContent>
                   </Select>
                 </div>
 
@@ -912,67 +951,94 @@ export default function ApprovalsPage() {
                 </div>
               )}
 
-              {Boolean(selectedLogbookEntry.evidenceItems?.length) && (
+              {/* Evidence of Performance */}
+              {selectedLogbookEntry.evidenceApprovalStatus?.toUpperCase() ===
+              "APPROVED" ? (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                     <FileText className="w-4 h-4" />
                     Evidence of Performance
                   </Label>
-                  <div className="space-y-2 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-                    {selectedLogbookEntry.evidenceItems?.map(
-                      (evidence, index) => (
-                        <div
-                          key={`${evidence.type}-${evidence.value}-${index}`}
-                          className="rounded-md border bg-white p-3 dark:bg-gray-950"
-                        >
-                          <p className="text-xs font-semibold text-gray-500">
-                            {evidence.type.replaceAll("_", " ")}
-                          </p>
-                          {evidence.type === "EMAIL" ? (
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
-                              {evidence.value}
-                            </p>
-                          ) : (
-                            <AttachmentTrigger
-                              url={evidence.value}
-                              name={evidence.name || evidence.value}
-                              mimeType={evidence.mimeType}
-                              evidenceType={evidence.type}
-                              variant="link"
-                              className="mt-1"
-                            />
-                          )}
-                          {evidence.mimeType && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {evidence.mimeType}
-                              {evidence.size != null
-                                ? ` · ${(evidence.size / 1024).toFixed(1)} KB`
-                                : ""}
-                            </p>
-                          )}
-                        </div>
-                      ),
-                    )}
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                        Evidence Verified & Approved
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                      Performance evidence was verified and approved by{" "}
+                      {selectedLogbookEntry.evidenceApprover?.fullName ||
+                        "the designated Evidence Approver"}
+                      .
+                    </p>
                   </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  {Boolean(selectedLogbookEntry.evidenceItems?.length) && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Evidence of Performance
+                      </Label>
+                      <div className="space-y-2 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+                        {selectedLogbookEntry.evidenceItems?.map(
+                          (evidence, index) => (
+                            <div
+                              key={`${evidence.type}-${evidence.value}-${index}`}
+                              className="rounded-md border bg-white p-3 dark:bg-gray-950"
+                            >
+                              <p className="text-xs font-semibold text-gray-500">
+                                {evidence.type.replaceAll("_", " ")}
+                              </p>
+                              {evidence.type === "EMAIL" ? (
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
+                                  {evidence.value}
+                                </p>
+                              ) : (
+                                <AttachmentTrigger
+                                  url={evidence.value}
+                                  name={evidence.name || evidence.value}
+                                  mimeType={evidence.mimeType}
+                                  evidenceType={evidence.type}
+                                  variant="link"
+                                  className="mt-1"
+                                />
+                              )}
+                              {evidence.mimeType && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                  {evidence.mimeType}
+                                  {evidence.size != null
+                                    ? ` · ${(evidence.size / 1024).toFixed(1)} KB`
+                                    : ""}
+                                </p>
+                              )}
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Legacy Evidence URL */}
-              {selectedLogbookEntry.evidenceUrl &&
-                !selectedLogbookEntry.evidenceItems?.length && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <LinkIcon className="w-4 h-4" />
-                    Evidence Link
-                  </Label>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                    <AttachmentTrigger
-                      url={selectedLogbookEntry.evidenceUrl}
-                      name={selectedLogbookEntry.evidenceUrl}
-                      variant="link"
-                    />
-                  </div>
-                </div>
+                  {/* Legacy Evidence URL */}
+                  {selectedLogbookEntry.evidenceUrl &&
+                    !selectedLogbookEntry.evidenceItems?.length && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                          <LinkIcon className="w-4 h-4" />
+                          Evidence Link
+                        </Label>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                          <AttachmentTrigger
+                            url={selectedLogbookEntry.evidenceUrl}
+                            name={selectedLogbookEntry.evidenceUrl}
+                            variant="link"
+                          />
+                        </div>
+                      </div>
+                    )}
+                </>
               )}
 
               {/* Decisions Made / Remark */}

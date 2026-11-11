@@ -92,6 +92,7 @@ export function CheckInTableRow({
   isSelectionEnabled = false,
   isSelected = false,
   onSelectionChange,
+  onRefetch,
   onSubmitForApproval,
   submittingTaskForApproval = false,
 }: CheckInTableRowProps) {
@@ -134,9 +135,19 @@ export function CheckInTableRow({
         },
       });
       toast.success("Task deleted successfully");
+      onRefetch?.();
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete task");
-      console.error(error);
+      const errStr = error?.message?.toLowerCase() || "";
+      if (
+        errStr.includes("not found") ||
+        errStr.includes("cannot return null for non-nullable field")
+      ) {
+        toast.success("Task deleted successfully");
+        onRefetch?.();
+      } else {
+        toast.error(error.message || "Failed to delete task");
+        console.error(error);
+      }
     }
   };
 
@@ -150,11 +161,10 @@ export function CheckInTableRow({
 
   return (
     <tr
-      className={`group border-l-[3px] ${taskColors.border} ${
-        !isEditable
-          ? "bg-gray-50/80 dark:bg-gray-900/40"
-          : "bg-white hover:bg-gray-50/90 dark:bg-transparent dark:hover:bg-gray-900/30"
-      } transition-colors`}
+      className={`group border-l-[3px] ${taskColors.border} ${!isEditable
+        ? "bg-gray-50/80 dark:bg-gray-900/40"
+        : "bg-white hover:bg-gray-50/90 dark:bg-transparent dark:hover:bg-gray-900/30"
+        } transition-colors`}
     >
       {isSelectionEnabled && onSelectionChange && (
         <td className="px-3 py-3 align-top">
@@ -279,16 +289,15 @@ export function CheckInTableRow({
       {/* Checkout */}
       <td className="px-3 py-3 align-top">
         <Badge
-          className={`whitespace-nowrap text-[10px] ${
-            STATUS_COLORS[task.checkoutStatus] || STATUS_COLORS.NOT_DONE
-          }`}
+          className={`whitespace-nowrap text-[10px] ${STATUS_COLORS[task.checkoutStatus] || STATUS_COLORS.NOT_DONE
+            }`}
         >
           {task.checkoutStatus
             ? task.checkoutStatus.replace("_", " ")
             : "Unknown"}
           {task.checkoutStatus === "DONE" &&
-          task.requiresApproval &&
-          !task.approvedAt
+            task.requiresApproval &&
+            !task.approvedAt
             ? " · Pending"
             : ""}
         </Badge>

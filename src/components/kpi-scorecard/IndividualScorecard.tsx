@@ -2,6 +2,7 @@
 
 import { AchievementDisplay, AchievementBadge } from "@/components/ui/achievement-display";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { usePermissions } from "@/hooks/permissions/usePermissions";
 import {
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   ArrowRight,
   Info,
+  Sparkles,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@apollo/client";
@@ -34,6 +36,9 @@ import type { KpiQuarterPlan, KpiQuarterResult } from "@/types/graphql";
 import { SortableFilterableHeader } from "@/components/ui/sortable-filterable-header";
 import { useTableColumnControls } from "@/hooks/table/useTableColumnControls";
 import { useStrategicPeriodStore } from "@/stores";
+import { cn } from "@/lib/utils";
+import { PredictiveScorecardSimulator } from "./PredictiveScorecardSimulator";
+import { EarlyWarningAtRiskAlert } from "./EarlyWarningAtRiskAlert";
 
 interface KpiScore {
   aggregatedKpiScoreId: string;
@@ -85,6 +90,31 @@ export default function IndividualScorecard({
     user?.employeeId || "",
   );
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
+  const [showSimulator, setShowSimulator] = useState<boolean>(false);
+
+  // Active fiscal quarter and calendar elapsed pacing calculation
+  const { currentQuarterNumber, calendarElapsed } = useMemo(() => {
+    const now = new Date();
+    const m = now.getMonth();
+    // Fiscal quarters starting in July (6):
+    // Jul(6), Aug(7), Sep(8) -> Q1
+    // Oct(9), Nov(10), Dec(11) -> Q2
+    // Jan(0), Feb(1), Mar(2) -> Q3
+    // Apr(3), May(4), Jun(5) -> Q4
+    const q = m >= 6 ? Math.floor((m - 6) / 3) + 1 : Math.floor(m / 3) + 3;
+    let qStartMonth = 9;
+    if (q === 1) qStartMonth = 6;
+    else if (q === 2) qStartMonth = 9;
+    else if (q === 3) qStartMonth = 0;
+    else if (q === 4) qStartMonth = 3;
+
+    const qStartDate = new Date(now.getFullYear(), qStartMonth, 1);
+    const qEndDate = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+    const totalMs = qEndDate.getTime() - qStartDate.getTime();
+    const elapsedMs = now.getTime() - qStartDate.getTime();
+    const elapsed = Math.max(0.05, Math.min(1.0, elapsedMs / totalMs));
+    return { currentQuarterNumber: q, calendarElapsed: elapsed };
+  }, []);
 
   // Enforce: Regular employees can only view their own scorecard
   useEffect(() => {
@@ -192,30 +222,38 @@ export default function IndividualScorecard({
       columns: scorecardColumns,
     });
 
-  const getAchievementColor = (rate: number): string => {
-    if (rate >= 1.0) return "text-green-600";
-    if (rate >= 0.75) return "text-blue-600";
-    if (rate >= 0.6) return "text-yellow-600";
+  const getAchievementColor = (rate: number | null | undefined): string => {
+    if (rate === null || rate === undefined || isNaN(Number(rate))) return "text-muted-foreground";
+    const val = Number(rate);
+    if (val >= 1.0) return "text-green-600";
+    if (val >= 0.75) return "text-blue-600";
+    if (val >= 0.6) return "text-yellow-600";
     return "text-red-600";
   };
 
   const getAchievementBadge = (
-    rate: number,
+    rate: number | null | undefined,
   ): { label: string; variant: any } => {
-    if (rate >= 1.3)
+    if (rate === null || rate === undefined || isNaN(Number(rate))) {
+      return { label: "Pending", variant: "outline" };
+    }
+    const val = Number(rate);
+    if (val >= 1.3)
       return { label: "Exceeds Expectations", variant: "default" };
-    if (rate >= 1.0)
+    if (val >= 1.0)
       return { label: "Meets Expectations", variant: "secondary" };
-    if (rate >= 0.75) return { label: "Needs Improvement", variant: "outline" };
+    if (val >= 0.75) return { label: "Needs Improvement", variant: "outline" };
     return { label: "Below Expectations", variant: "destructive" };
   };
 
-  const formatNumber = (num: number): string => {
-    return num.toFixed(2);
+  const formatNumber = (num: number | null | undefined): string => {
+    if (num === null || num === undefined || isNaN(Number(num))) return "0.00";
+    return Number(num).toFixed(2);
   };
 
-  const formatPercentage = (num: number): string => {
-    return `${(num * 100).toFixed(1)}%`;
+  const formatPercentage = (num: number | null | undefined): string => {
+    if (num === null || num === undefined || isNaN(Number(num))) return "0.0%";
+    return `${(Number(num) * 100).toFixed(1)}%`;
   };
 
   if (!user) {
@@ -237,17 +275,36 @@ export default function IndividualScorecard({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Simulator Toggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
             Individual KPI Scorecard
           </h2>
           <p className="text-sm text-muted-foreground">
-            Track your KPI performance and achievements
+            Track your KPI performance, pacing indicators, and composite achievements
           </p>
         </div>
-        <TrendingUp className="hidden h-8 w-8 shrink-0 text-primary sm:block" />
+        <div className="flex items-center gap-2">
+          {hasIndividualKpis && (
+            <Button
+              type="button"
+              variant={showSimulator ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowSimulator(!showSimulator)}
+              className={cn(
+                "h-9 gap-1.5 text-xs font-semibold shadow-xs",
+                showSimulator
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  : "border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-950",
+              )}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>{showSimulator ? "Close Simulator" : "Predictive Simulator"}</span>
+            </Button>
+          )}
+          <TrendingUp className="hidden h-8 w-8 shrink-0 text-primary sm:block" />
+        </div>
       </div>
 
       {/* Filters */}
@@ -345,6 +402,22 @@ export default function IndividualScorecard({
       {/* Scorecard Summary */}
       {!scorecardLoading && scorecard && hasIndividualKpis && (
         <>
+          {/* Early Warning & At-Risk Alert */}
+          <EarlyWarningAtRiskAlert
+            kpiScores={scorecard.kpiScores}
+            currentQuarter={currentQuarterNumber}
+          />
+
+          {/* Predictive Performance Simulator (What-If Analysis) */}
+          {showSimulator && (
+            <PredictiveScorecardSimulator
+              currentTotalScore={scorecard.totalScore}
+              maxPossibleScore={scorecard.maxPossibleScore}
+              kpiScores={scorecard.kpiScores as any}
+              currentQuarter={currentQuarterNumber}
+            />
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Total Score Card */}
@@ -433,27 +506,34 @@ export default function IndividualScorecard({
           {/* KPI Details Table */}
           <Card>
             <CardHeader>
-              <CardTitle>KPI Performance Details</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>KPI Performance Details</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs font-mono">
+                    Active Quarter: Q{currentQuarterNumber}
+                  </Badge>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-                <table className={`w-full min-w-[720px] ${stickyFirstColumnTableClassName}`}>
+                <table className={`w-full min-w-[900px] ${stickyFirstColumnTableClassName}`}>
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-3 font-medium">
+                      <th className="text-left p-3 font-medium min-w-[180px]">
                         <SortableFilterableHeader
                           label="KPI Name"
                           {...getHeaderProps("name")}
                         />
                       </th>
-                      <th className="text-center p-3 font-medium">
+                      <th className="text-center p-3 font-medium min-w-[90px]">
                         <SortableFilterableHeader
                           label="Level"
                           align="center"
                           {...getHeaderProps("level")}
                         />
                       </th>
-                      <th className="text-center p-3 font-medium">
+                      <th className="text-center p-3 font-medium min-w-[110px]">
                         <SortableFilterableHeader
                           label="Mode"
                           align="center"
@@ -467,7 +547,7 @@ export default function IndividualScorecard({
                           {...getHeaderProps("mode")}
                         />
                       </th>
-                      <th className="text-center p-3 font-medium">
+                      <th className="text-center p-3 font-medium min-w-[220px]">
                         Quarterly Performance
                       </th>
                       <th className="text-right p-3 font-medium">
@@ -532,16 +612,45 @@ export default function IndividualScorecard({
                             (assignment as any).weight,
                       );
 
+                      // Evaluate active quarter target and at-risk pacing
+                      const plans = kpiScore.kpi.quarterPlans || [];
+                      const results = kpiScore.kpi.quarterResults || [];
+                      const activePlan = plans.find((p: any) => p.quarterNumber === currentQuarterNumber);
+                      const activeEffTarget = activePlan ? Number(activePlan.effectiveTarget ?? activePlan.originalTarget ?? 0) : null;
+                      const activeResult = results.find((r: any) => activePlan && r.quarterPlanId === activePlan.kpiQuarterPlanId);
+                      const activeDelivered = activeResult ? Number(activeResult.finalActual ?? 0) : 0;
+                      const isZeroQTarget = activePlan != null && activeEffTarget === 0;
+                      const isRowAtRisk =
+                        !isZeroQTarget &&
+                        activeEffTarget != null &&
+                        activeEffTarget > 0 &&
+                        activeDelivered / activeEffTarget - calendarElapsed <= -0.2;
+
                       return (
                         <tr
                           key={kpiScore.aggregatedKpiScoreId}
-                          className="border-b hover:bg-muted/50"
+                          className={cn(
+                            "border-b transition-colors hover:bg-muted/50",
+                            isRowAtRisk && "bg-red-50/20 dark:bg-red-950/10",
+                          )}
                         >
                           <td className="p-3">
                             <div>
-                              <p className="font-medium">{kpiScore.kpi.name}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-medium">{kpiScore.kpi.name}</p>
+                                {isRowAtRisk && (
+                                  <Badge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 border-red-300 text-[10px] px-1.5 py-0 font-bold">
+                                    🚨 At-Risk
+                                  </Badge>
+                                )}
+                                {isZeroQTarget && (
+                                  <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-300 dark:border-slate-700">
+                                    No Q{currentQuarterNumber} Target
+                                  </Badge>
+                                )}
+                              </div>
                               {kpiScore.kpi.description && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   {kpiScore.kpi.description}
                                 </p>
                               )}
@@ -591,7 +700,7 @@ export default function IndividualScorecard({
                           <td className="text-right p-3">
                             <div className="flex flex-col items-end gap-1">
                               <div className="flex items-center gap-1">
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-xs font-semibold">
                                   {formatNumber(kpiScore.weight)}%
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
@@ -603,7 +712,7 @@ export default function IndividualScorecard({
                                   <ArrowRight className="w-3 h-3 text-muted-foreground" />
                                   <Badge
                                     variant="secondary"
-                                    className="text-xs bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+                                    className="text-xs bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300 font-semibold"
                                   >
                                     {formatNumber(
                                       (assignment as any)
@@ -659,7 +768,7 @@ export default function IndividualScorecard({
               {/* Formula Explanation */}
               <div className="mt-6 p-4 bg-muted rounded-lg space-y-3">
                 <h4 className="text-sm font-semibold mb-2">
-                  How Scores are Calculated
+                  How Scores & Weight Disruptions are Calculated
                 </h4>
                 <p className="text-xs text-muted-foreground">
                   <strong>Formula:</strong> Score = Weight × min(Actual /
@@ -679,6 +788,9 @@ export default function IndividualScorecard({
                 <p className="text-xs text-muted-foreground">
                   • <strong>Cap:</strong> Maximum achievement rate (e.g., 150%
                   means max 1.5x of weight)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  • <strong>Early Warning Pacing:</strong> Flags KPIs mid-quarter when progress falls ≥20% behind elapsed calendar time, prompting alignment check-in sessions before period end.
                 </p>
 
                 {/* KPI Mode Explanation */}

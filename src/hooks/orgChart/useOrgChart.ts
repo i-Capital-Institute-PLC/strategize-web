@@ -11,6 +11,7 @@ export interface OrgChartEmployee {
 
 export interface OrgChartNode {
   id: string;
+  legacyId?: string | null;
   name: string;
   subtitle?: string | null;
   color?: string | null;
@@ -29,7 +30,7 @@ export function useOrgChart() {
   const { data, loading, error, refetch } = useQuery(GET_ORG_CHART, {
     variables: { organizationId },
     skip: !organizationId,
-    fetchPolicy: 'cache-first',
+    fetchPolicy: 'cache-and-network',
     nextFetchPolicy: 'cache-first',
   });
 

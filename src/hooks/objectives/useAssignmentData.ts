@@ -6,6 +6,7 @@ import { GET_DIVISIONS } from "@/lib/graphql/queries/divisions";
 import { GET_DEPARTMENTS, GET_DEPARTMENT_SAFE } from "@/lib/graphql/queries/departments";
 import { GET_DIVISION_SAFE } from "@/lib/graphql/queries/divisions";
 import { GET_EMPLOYEES, GET_DIRECT_REPORTS } from "@/lib/graphql/queries/employees";
+import { GET_TEAMS, GET_TEAM } from "@/lib/graphql/queries/teams";
 import { useAssignmentContext, type AssigneeType } from "@/context/AssignmentContext";
 import { usePermissions } from "@/hooks/permissions/usePermissions";
 import { useUser } from "@/stores";
@@ -43,8 +44,24 @@ export function useAssignmentData(assigneeTypeOverride?: AssigneeType) {
     const effectiveSourceType = sourceObjective?.assigneeType?.toUpperCase() || sourceObjectiveType;
     const isDivisionSource = effectiveSourceType === "DIVISION" && sourceObjective?.assigneeId;
     const isDepartmentSource = effectiveSourceType === "DEPARTMENT" && sourceObjective?.assigneeId;
+    const isUnitSource = effectiveSourceType === "UNIT" && sourceObjective?.assigneeId;
     const shouldFetchDepartments = assigneeType === "DEPARTMENT";
+    const shouldFetchUnits = assigneeType === "UNIT";
     const shouldFetchPersonnel = assigneeType === "PERSONNEL";
+
+    // Fetch Units (Division -> Unit or Department -> Unit)
+    const { data: teamsData, loading: loadingTeams } = useQuery(GET_TEAMS, {
+        variables: {
+            page: 1,
+            limit: 1000,
+            search: searchTerm || undefined,
+            divisionId: isDivisionSource ? sourceObjective?.assigneeId : undefined,
+            departmentId: isDepartmentSource ? sourceObjective?.assigneeId : undefined,
+        },
+        skip: !shouldFetchUnits,
+        fetchPolicy: "cache-first",
+        nextFetchPolicy: "cache-first",
+    });
 
     // Use full GET_DEPARTMENTS to get employees and division info safely for local filtering
     const { data: allDepartmentsData, loading: loadingAllDepartments } = useQuery(GET_DEPARTMENTS, {
@@ -87,6 +104,13 @@ export function useAssignmentData(assigneeTypeOverride?: AssigneeType) {
     const { data: scopedDepartmentData, loading: loadingScopedDepartment } = useQuery(GET_DEPARTMENT_SAFE, {
         variables: { departmentId: sourceObjective?.assigneeId },
         skip: !isDepartmentSource,
+        fetchPolicy: "cache-first",
+        nextFetchPolicy: "cache-first",
+    });
+
+    const { data: scopedTeamData, loading: loadingScopedTeam } = useQuery(GET_TEAM, {
+        variables: { teamId: sourceObjective?.assigneeId },
+        skip: !isUnitSource,
         fetchPolicy: "cache-first",
         nextFetchPolicy: "cache-first",
     });
@@ -135,11 +159,65 @@ export function useAssignmentData(assigneeTypeOverride?: AssigneeType) {
             }
         }
 
+        if (assigneeType === "UNIT") {
+            const allTeams = (teamsData?.teams?.items || []);
+            let filtered = allTeams;
+
+            if (isDepartmentSource) {
+                const targetDeptId = sourceObjective?.assigneeId?.toString();
+                filtered = allTeams.filter(
+                    (team: any) =>
+                        team.department?.departmentId?.toString() === targetDeptId ||
+                        team.departmentId?.toString() === targetDeptId,
+                );
+            } else if (isDivisionSource) {
+                const targetDivId = sourceObjective?.assigneeId?.toString();
+                filtered = allTeams.filter(
+                    (team: any) =>
+                        team.division?.divisionId?.toString() === targetDivId ||
+                        team.divisionId?.toString() === targetDivId ||
+                        team.department?.division?.divisionId?.toString() === targetDivId,
+                );
+            }
+
+            if (!searchTerm) return filtered;
+            return filtered.filter((team: any) =>
+                team.name.toLowerCase().includes(searchTerm.toLowerCase()),
+            );
+        }
+
         if (assigneeType === "PERSONNEL") {
             let allEmployees: Employee[] = [];
             const allDepts = (allDepartmentsData?.departments?.items || []) as Department[];
 
-            if (isDepartmentSource) {
+            if (isUnitSource) {
+                // Scenario: Unit -> Personnel
+                const unit = scopedTeamData?.team;
+                const deptId = unit?.department?.departmentId;
+                if (deptId) {
+                    const deptMatch = allDepts.find(
+                        (department) => department.departmentId?.toString() === deptId.toString(),
+                    );
+                    allEmployees = deptMatch?.employees ? [...deptMatch.employees] : [];
+                } else if (unit?.division?.divisionId) {
+                    const activeDivisionId = unit.division.divisionId.toString();
+                    const divisionDeptsFallback = allDepts.filter(
+                        (department) => department.division?.divisionId?.toString() === activeDivisionId,
+                    );
+                    const seenIds = new Set<string>();
+                    divisionDeptsFallback.forEach((department) => {
+                        (department.employees || []).forEach((employee) => {
+                            if (!seenIds.has(employee.employeeId)) {
+                                seenIds.add(employee.employeeId);
+                                allEmployees.push(employee);
+                            }
+                        });
+                    });
+                }
+                if (unit?.teamLead && !allEmployees.some((e) => e.employeeId === unit.teamLead.employeeId)) {
+                    allEmployees.unshift(unit.teamLead as Employee);
+                }
+            } else if (isDepartmentSource) {
                 // Scenario: Department -> Personnel
                 // Use GET_DEPARTMENT_SAFE as it matches the working employee dashboard 
                 const dept = scopedDepartmentData?.department;
@@ -236,19 +314,23 @@ export function useAssignmentData(assigneeTypeOverride?: AssigneeType) {
         searchTerm,
         divisionsData,
         allDepartmentsData,
+        teamsData,
         scopedDivisionData,
         scopedDepartmentData,
+        scopedTeamData,
         globalEmployeesData,
         directReportsData,
         isAdmin,
         isDivisionSource,
         isDepartmentSource,
+        isUnitSource,
         sourceObjective,
         loadingScopedDepartment,
         loadingScopedDivision,
+        loadingScopedTeam,
     ]);
 
-    const loading = loadingDivisions || loadingAllDepartments || loadingScopedDivision || loadingScopedDepartment || loadingGlobalEmployees || loadingDirectReports;
+    const loading = loadingDivisions || loadingAllDepartments || loadingTeams || loadingScopedDivision || loadingScopedDepartment || loadingScopedTeam || loadingGlobalEmployees || loadingDirectReports;
     const error = null;
 
     return {

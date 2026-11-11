@@ -4,9 +4,10 @@ import { getLogbookPeriodFields } from "./logbook-entry-period";
 import { FormulaConfigurationCard } from "./FormulaConfigurationCard";
 import { RatioFormulaInputSection } from "./RatioFormulaInputSection";
 import { DirectValueInputSection } from "./DirectValueInputSection";
+import { KpiLiveImpactCard } from "./KpiLiveImpactCard";
 import { normalizeMetricObservationValue } from "./metric-observation-value";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@apollo/client";
 import {
   CREATE_LOGBOOK_ENTRY,
@@ -25,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, UploadIcon, XIcon, ClockIcon } from "lucide-react";
+import { CalendarIcon, UploadIcon, XIcon, ClockIcon, Calculator, Target } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
@@ -138,10 +139,16 @@ export function LogbookEntryDialog({
     userId: currentUser?.employeeId,
     strategicPeriodId: selectedPeriod?.strategicPeriodId,
     purpose: "LOGBOOK",
+    status: "APPROVED",
   });
 
   // The API applies the same ownership and mode rules when listing and saving.
-  const availableKpis = assignedKpis;
+  // Filter to ensure only APPROVED KPIs are selectable in logbook
+  const availableKpis = useMemo(() => {
+    return assignedKpis.filter(
+      (kpi) => (kpi as any).status === "APPROVED" || (!(kpi as any).status && (!(kpi as any).targetStatus || (kpi as any).targetStatus === "APPROVED")),
+    );
+  }, [assignedKpis]);
 
   // Mutations
   const [createEntryMutation, { loading: creating }] = useMutation(
@@ -210,7 +217,7 @@ export function LogbookEntryDialog({
       entryDate: format(entryDate, "yyyy-MM-dd"),
       strategicPeriodId: contextPeriodId,
     },
-    skip: !open || !linkedKpiId || !isBasisDrivenKpi,
+    skip: !open || !linkedKpiId,
     fetchPolicy: "cache-first",
   });
   const resultEntryContext = resultContextData?.kpiResultEntryContext;
@@ -244,6 +251,78 @@ export function LogbookEntryDialog({
       !open || !isFormulaKpi || !linkedKpiId || !currentUser?.organizationId,
   });
   const boundFormula = formulaData?.logbookFormulaForContext;
+
+  // Task 2.4: Resolve approved quarterly denominator for the selected KPI and entryDate
+  const resolvedQuarterDenominator = useMemo(() => {
+    // 1. If backend resolved basis is available from context, use it as authoritative
+    const contextBasis =
+      resultEntryContext?.resolvedBasisExact ||
+      resultEntryContext?.approvedBasisExact;
+    if (contextBasis != null && contextBasis !== "") {
+      const parsed = parseFloat(contextBasis);
+      if (!isNaN(parsed)) {
+        return parsed % 1 === 0 ? String(parsed) : contextBasis.replace(/\.?0+$/, "");
+      }
+      return contextBasis;
+    }
+
+    if (!selectedKpi || !entryDate) return null;
+
+    // 2. Fallback to client-side quarter plan lookup
+    let currentQuarter = resultEntryContext?.quarterNumber;
+    if (!currentQuarter) {
+      const m = entryDate.getMonth();
+      // Fiscal year starts in July (month index 6):
+      // Jul(6), Aug(7), Sep(8) -> Q1
+      // Oct(9), Nov(10), Dec(11) -> Q2
+      // Jan(0), Feb(1), Mar(2) -> Q3
+      // Apr(3), May(4), Jun(5) -> Q4
+      currentQuarter = m >= 6 ? Math.floor((m - 6) / 3) + 1 : Math.floor(m / 3) + 3;
+    }
+
+    const isDirectBasis = selectedKpi.calculationBasisSource === "DIRECT_VALUE";
+
+    const quarterPlan = selectedKpi.quarterPlans?.find(
+      (q: any) => q.quarterNumber === currentQuarter && (q.status === "APPROVED" || !q.status),
+    );
+
+    if (isDirectBasis) {
+      if (quarterPlan?.directBasisTarget != null && quarterPlan.directBasisTarget !== "") {
+        const val = parseFloat(quarterPlan.directBasisTarget);
+        return isNaN(val) ? quarterPlan.directBasisTarget : String(val);
+      }
+      const directTarget = (selectedKpi as any)?.directBasisTargets?.find((t: any) =>
+        t.timeline && (
+          t.timeline.toUpperCase().endsWith("-Q" + currentQuarter) ||
+          t.timeline.toUpperCase().endsWith("Q" + currentQuarter)
+        ),
+      );
+      if (directTarget?.value) {
+        const val = parseFloat(directTarget.value);
+        return isNaN(val) ? directTarget.value : String(val);
+      }
+      if (selectedKpi.directBasisValue) {
+        const val = parseFloat(selectedKpi.directBasisValue);
+        return isNaN(val) ? selectedKpi.directBasisValue : String(val);
+      }
+    } else {
+      if ((quarterPlan as any)?.effectiveTarget != null) {
+        return String((quarterPlan as any).effectiveTarget);
+      }
+      const regularTarget = (selectedKpi as any)?.targets?.find((t: any) =>
+        t.timeline && (
+          t.timeline.toUpperCase().endsWith("-Q" + currentQuarter) ||
+          t.timeline.toUpperCase().endsWith("Q" + currentQuarter)
+        ),
+      );
+      if (regularTarget?.target != null) {
+        return String(regularTarget.target);
+      }
+    }
+
+    return null;
+  }, [resultEntryContext, selectedKpi, entryDate]);
+
   const formulaSources = getOrderedLogbookFormulaSources(boundFormula);
   const metricSources = formulaSources
     .filter(
@@ -257,6 +336,242 @@ export function LogbookEntryDialog({
             candidate.metricDefinitionId === source.metricDefinitionId,
         ) === index,
     );
+
+  // Sync resolved locked quarterly denominator to state variables and metric observations
+  useEffect(() => {
+    if (selectedKpi?.calculationType === "RATIO_FORMULA" && resolvedQuarterDenominator) {
+      setKpiActualDenominatorExact(resolvedQuarterDenominator);
+
+      // Pre-fill metric observation for denominator term(s)
+      const denSources = metricSources.filter(
+        (s) =>
+          s.side === "DENOMINATOR" ||
+          (selectedKpi?.calculationType === "RATIO_FORMULA" && s.position === 2),
+      );
+      if (denSources.length > 0) {
+        setMetricObservationValues((prev) => {
+          let hasChange = false;
+          const next = { ...prev };
+          for (const ds of denSources) {
+            if (next[ds.metricDefinitionId] !== resolvedQuarterDenominator) {
+              next[ds.metricDefinitionId] = resolvedQuarterDenominator;
+              hasChange = true;
+            }
+          }
+          return hasChange ? next : prev;
+        });
+      }
+
+      const num = parseFloat(kpiActualNumeratorExact || "0");
+      const den = parseFloat(resolvedQuarterDenominator);
+      if (!isNaN(num) && !isNaN(den) && den !== 0) {
+        const multiplier = boundFormula?.multiplier || 100;
+        const result = (num / den) * multiplier;
+        setKpiAchievedValue(result.toFixed(2));
+      }
+    }
+  }, [
+    selectedKpi?.calculationType,
+    resolvedQuarterDenominator,
+    metricSources,
+    kpiActualNumeratorExact,
+    boundFormula?.multiplier,
+  ]);
+
+  // Live calculation preview for formula ratio KPIs
+  const formulaRatioPreview = useMemo(() => {
+    if (!boundFormula || selectedKpi?.calculationType !== "RATIO_FORMULA") {
+      return null;
+    }
+    const numSource = metricSources.find(
+      (s) => s.side === "NUMERATOR" || s.position === 1,
+    );
+    const denSource = metricSources.find(
+      (s) => s.side === "DENOMINATOR" || s.position === 2,
+    );
+    if (!numSource || !denSource) return null;
+
+    const numVal = metricObservationValues[numSource.metricDefinitionId];
+    const denVal =
+      resolvedQuarterDenominator ||
+      metricObservationValues[denSource.metricDefinitionId];
+
+    const num = parseFloat(numVal || "0");
+    const den = parseFloat(denVal || "0");
+
+    if (isNaN(num) || isNaN(den) || den === 0 || !numVal) {
+      return null;
+    }
+
+    const multiplier = boundFormula.multiplier || 100;
+    const calculatedRate = (num / den) * multiplier;
+    const target =
+      parseFloat(kpiTargetValue) ||
+      selectedKpi?.targetValue ||
+      100;
+    const achievementPercent =
+      target > 0 ? (calculatedRate / target) * 100 : null;
+
+    let status: "success" | "warning" | "danger" = "danger";
+    if (achievementPercent !== null) {
+      if (achievementPercent >= 100) status = "success";
+      else if (achievementPercent >= 75) status = "warning";
+    }
+
+    return {
+      numStr: numVal,
+      denStr: denVal,
+      multiplier,
+      calculatedRate,
+      target,
+      achievementPercent,
+      status,
+    };
+  }, [
+    boundFormula,
+    selectedKpi,
+    formulaSources,
+    metricObservationValues,
+    resolvedQuarterDenominator,
+    kpiTargetValue,
+  ]);
+
+  const getProgressStatusColor = (status: "success" | "warning" | "danger") => {
+    switch (status) {
+      case "success":
+        return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/50";
+      case "warning":
+        return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/50";
+      case "danger":
+        return "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/50";
+      default:
+        return "";
+    }
+  };
+
+  // Resolve active fiscal quarter number
+  const currentQuarterNumber = useMemo(() => {
+    if (resultEntryContext?.quarterNumber) return resultEntryContext.quarterNumber;
+    const m = entryDate.getMonth();
+    return m >= 6 ? Math.floor((m - 6) / 3) + 1 : Math.floor(m / 3) + 3;
+  }, [resultEntryContext?.quarterNumber, entryDate]);
+
+  // Find quarter plan for active quarter
+  const activeQuarterPlan = useMemo(() => {
+    return (selectedKpi as any)?.quarterPlans?.find(
+      (q: any) => q.quarterNumber === currentQuarterNumber,
+    );
+  }, [selectedKpi, currentQuarterNumber]);
+
+  // Live Quarter Target
+  const liveQuarterTarget = useMemo(() => {
+    if (!selectedKpi) return 0;
+    if (activeQuarterPlan?.effectiveTarget != null) {
+      const val = Number(activeQuarterPlan.effectiveTarget);
+      if (!isNaN(val)) return val;
+    }
+    if (activeQuarterPlan?.directBasisTarget != null) {
+      const val = parseFloat(activeQuarterPlan.directBasisTarget);
+      if (!isNaN(val)) return val;
+    }
+    const timelineTarget = (selectedKpi as any)?.targets?.find((t: any) =>
+      t.timeline && (
+        t.timeline.toUpperCase().endsWith("-Q" + currentQuarterNumber) ||
+        t.timeline.toUpperCase().endsWith("Q" + currentQuarterNumber)
+      ),
+    );
+    if (timelineTarget?.target != null) {
+      const val = Number(timelineTarget.target);
+      if (!isNaN(val)) return val;
+    }
+    if (kpiTargetValue && !isNaN(parseFloat(kpiTargetValue))) {
+      return parseFloat(kpiTargetValue);
+    }
+    if (selectedKpi?.targetValue != null) {
+      return Number(selectedKpi.targetValue) / 4;
+    }
+    return 0;
+  }, [selectedKpi, activeQuarterPlan, currentQuarterNumber, kpiTargetValue]);
+
+  // Live Annual Target
+  const liveAnnualTarget = useMemo(() => {
+    if (!selectedKpi) return 0;
+    if (selectedKpi.targetValue != null && Number(selectedKpi.targetValue) > 0) {
+      return Number(selectedKpi.targetValue);
+    }
+    if (selectedKpi.quarterPlans && selectedKpi.quarterPlans.length > 0) {
+      const sum = selectedKpi.quarterPlans.reduce((acc: number, q: any) => {
+        return acc + (Number(q.effectiveTarget) || 0);
+      }, 0);
+      if (sum > 0) return sum;
+    }
+    return liveQuarterTarget * 4;
+  }, [selectedKpi, liveQuarterTarget]);
+
+  // Delivered prior to this entry for current quarter
+  const deliveredPriorQuarter = useMemo(() => {
+    if (!selectedKpi) return 0;
+    const qResult = (selectedKpi as any)?.quarterResults?.find(
+      (r: any) => r.quarterPlanId === activeQuarterPlan?.kpiQuarterPlanId,
+    );
+    if (qResult?.finalActual != null) {
+      const val = Number(qResult.finalActual);
+      if (!isNaN(val)) return val;
+    }
+    return 0;
+  }, [selectedKpi, activeQuarterPlan]);
+
+  // Delivered prior to this entry for annual
+  const deliveredPriorAnnual = useMemo(() => {
+    if (!selectedKpi) return 0;
+    if ((selectedKpi as any)?.quarterResults?.length) {
+      const sum = (selectedKpi as any).quarterResults.reduce(
+        (acc: number, r: any) => acc + (Number(r.finalActual) || 0),
+        0,
+      );
+      if (sum > 0) return sum;
+    }
+    if ((selectedKpi as any)?.latestUpdate?.achievedValue != null) {
+      const val = Number((selectedKpi as any).latestUpdate.achievedValue);
+      if (!isNaN(val)) return val;
+    }
+    return deliveredPriorQuarter;
+  }, [selectedKpi, deliveredPriorQuarter]);
+
+  // Live entered achieved value from any active input mode
+  const liveEnteredValue = useMemo(() => {
+    if (isFormulaKpi) {
+      if (formulaRatioPreview?.calculatedRate != null) {
+        return formulaRatioPreview.calculatedRate;
+      }
+    }
+    if (isBasisDrivenKpi) {
+      if (resultPreview.rateExact) {
+        const parsed = parseFloat(resultPreview.rateExact);
+        if (!isNaN(parsed)) return parsed;
+      }
+      if (kpiActualNumeratorExact) {
+        const parsed = parseFloat(kpiActualNumeratorExact);
+        if (!isNaN(parsed)) return parsed;
+      }
+    }
+    if (kpiAchievedValue) {
+      const parsed = parseFloat(kpiAchievedValue);
+      if (!isNaN(parsed)) return parsed;
+    }
+    if (kpiActualNumeratorExact) {
+      const parsed = parseFloat(kpiActualNumeratorExact);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  }, [
+    isFormulaKpi,
+    formulaRatioPreview,
+    isBasisDrivenKpi,
+    resultPreview,
+    kpiActualNumeratorExact,
+    kpiAchievedValue,
+  ]);
 
   const [dateOpen, setDateOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
@@ -467,13 +782,21 @@ export function LogbookEntryDialog({
         kpiTargetValue: target,
         contributionUnit: contributionUnit.trim() || null,
         metricObservations: isFormulaKpi
-          ? metricSources.map((source) => ({
-              metricDefinitionId: source.metricDefinitionId,
-              value: normalizeMetricObservationValue(
-                metricObservationValues[source.metricDefinitionId],
-              )!,
-              observedAt: format(entryDate, "yyyy-MM-dd"),
-            }))
+          ? metricSources.map((source) => {
+              const isDenominator =
+                source.side === "DENOMINATOR" ||
+                (selectedKpi?.calculationType === "RATIO_FORMULA" &&
+                  source.position === 2);
+              const val =
+                isDenominator && resolvedQuarterDenominator
+                  ? resolvedQuarterDenominator
+                  : (metricObservationValues[source.metricDefinitionId] ?? "");
+              return {
+                metricDefinitionId: source.metricDefinitionId,
+                value: normalizeMetricObservationValue(val)!,
+                observedAt: format(entryDate, "yyyy-MM-dd"),
+              };
+            })
           : [],
       };
 
@@ -564,28 +887,55 @@ export function LogbookEntryDialog({
 
 
 
+  const isRejectedEntry =
+    Boolean(editingEntry) &&
+    (String(editingEntry?.status || "").toUpperCase() === "REJECTED" ||
+      Boolean(editingEntry?.rejectionReason));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
           <DialogTitle className="text-xl font-semibold">
-            {editingEntry ? "Edit Logbook Entry" : "Add Logbook Entry"}
+            {editingEntry
+              ? isRejectedEntry
+                ? "Revise Rejected Logbook Entry"
+                : "Edit Logbook Entry"
+              : "Add Logbook Entry"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] px-6 py-6">
           <div className="space-y-5">
+            {/* Rejection notice for rejected entries */}
+            {isRejectedEntry && editingEntry?.rejectionReason && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+                <p className="text-xs font-semibold text-red-800 dark:text-red-300">
+                  Rejection Reason from Approver:
+                </p>
+                <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                  {editingEntry.rejectionReason}
+                </p>
+                <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  Task metadata (Date, Activity, and Linked KPI) is locked. You can only update your achievement value, outcome notes, and revised evidence below.
+                </p>
+              </div>
+            )}
             {/* Entry Date & Time */}
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Entry Date & Time <span className="text-red-500">*</span>
               </Label>
               <div className="flex gap-2">
-                <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <Popover open={isRejectedEntry ? false : dateOpen} onOpenChange={(o) => !isRejectedEntry && setDateOpen(o)}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="flex-1 h-10 justify-start text-sm font-normal"
+                      disabled={isRejectedEntry}
+                      className={cn(
+                        "flex-1 h-10 justify-start text-sm font-normal",
+                        isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                      )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4 text-gray-500 shrink-0" />
                       <span className="truncate">
@@ -614,11 +964,15 @@ export function LogbookEntryDialog({
                   </PopoverContent>
                 </Popover>
 
-                <Popover open={timeOpen} onOpenChange={setTimeOpen}>
+                <Popover open={isRejectedEntry ? false : timeOpen} onOpenChange={(o) => !isRejectedEntry && setTimeOpen(o)}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-32 h-10 justify-start text-sm font-normal shrink-0"
+                      disabled={isRejectedEntry}
+                      className={cn(
+                        "w-32 h-10 justify-start text-sm font-normal shrink-0",
+                        isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                      )}
                     >
                       <ClockIcon className="mr-1.5 h-4 w-4 text-gray-500 shrink-0" />
                       <span className="tabular-nums text-xs">
@@ -654,7 +1008,11 @@ export function LogbookEntryDialog({
                 placeholder="Enter activity title..."
                 value={activity}
                 onChange={(e) => setActivity(e.target.value)}
-                className="h-10 text-sm"
+                disabled={isRejectedEntry}
+                className={cn(
+                  "h-10 text-sm",
+                  isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                )}
               />
             </div>
 
@@ -667,7 +1025,11 @@ export function LogbookEntryDialog({
                 placeholder="Describe what you did..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="min-h-[100px] text-sm resize-none"
+                disabled={isRejectedEntry}
+                className={cn(
+                  "min-h-[100px] text-sm resize-none",
+                  isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                )}
               />
             </div>
 
@@ -699,8 +1061,14 @@ export function LogbookEntryDialog({
               <Select
                 value={linkedKpiId || "none"}
                 onValueChange={handleKpiChange}
+                disabled={isRejectedEntry}
               >
-                <SelectTrigger className="h-10 text-sm">
+                <SelectTrigger
+                  className={cn(
+                    "h-10 text-sm",
+                    isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                  )}
+                >
                   <SelectValue placeholder={kpisLoading ? "Loading your KPIs..." : "Select KPI"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -732,6 +1100,21 @@ export function LogbookEntryDialog({
                 </SelectContent>
               </Select>
 
+              {/* Live KPI Target, Remaining Quota & Impact Preview Card */}
+              {linkedKpiId && selectedKpi && (
+                <KpiLiveImpactCard
+                  kpiName={selectedKpi.name}
+                  quarterNumber={currentQuarterNumber}
+                  quarterTarget={liveQuarterTarget}
+                  annualTarget={liveAnnualTarget}
+                  deliveredPriorQuarter={deliveredPriorQuarter}
+                  deliveredPriorAnnual={deliveredPriorAnnual}
+                  enteredValue={liveEnteredValue}
+                  unitType={selectedKpi.unitType}
+                  measurementUnit={selectedKpi.measurementUnit}
+                />
+              )}
+
               {linkedKpiId && isFormulaKpi ? (
                 <div className="space-y-4 rounded-md border border-indigo-200 bg-indigo-50/50 p-4">
                   <div>
@@ -750,78 +1133,185 @@ export function LogbookEntryDialog({
                     <p className="text-sm text-gray-500">Loading formula…</p>
                   ) : boundFormula ? (
                     <div className="space-y-3">
-                      {formulaSources.map((source) => (
-                        <div
-                          key={source.key}
-                          className="space-y-3 rounded border bg-white px-3 py-3"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <p className="text-xs font-medium text-indigo-800">
-                                {source.label}
-                              </p>
-                              <p className="text-sm font-medium text-gray-900">
-                                {logbookFormulaSourceName(source)}
-                              </p>
+                      {formulaSources.map((source) => {
+                        const isDenominator =
+                          source.side === "DENOMINATOR" ||
+                          (selectedKpi?.calculationType === "RATIO_FORMULA" &&
+                            source.position === 2);
+                        const isLockedDenominator =
+                          Boolean(isDenominator && resolvedQuarterDenominator);
+
+                        return (
+                          <div
+                            key={source.key}
+                            className="space-y-3 rounded border bg-white px-3 py-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-medium text-indigo-800">
+                                    {source.label}
+                                  </p>
+                                  {isLockedDenominator && (
+                                    <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                      Locked
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {logbookFormulaSourceName(source)}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {source.factorExact !== undefined && (
+                                  <span className="rounded bg-indigo-100 px-2 py-1 font-mono text-xs text-indigo-900">
+                                    Factor: {source.factorExact}
+                                  </span>
+                                )}
+                                {source.weight !== undefined && (
+                                  <span className="rounded bg-indigo-100 px-2 py-1 font-mono text-xs text-indigo-900">
+                                    Weight: {source.weight}%
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                              {source.factorExact !== undefined && (
-                                <span className="rounded bg-indigo-100 px-2 py-1 font-mono text-xs text-indigo-900">
-                                  Factor: {source.factorExact}
+
+                            {source.sourceType === "METRIC" ? (
+                              <div className="space-y-2">
+                                <Label className="text-xs text-gray-700">
+                                  Observed metric value
+                                </Label>
+                                <FormattedNumberInput
+                                  autoComplete="off"
+                                  value={
+                                    isLockedDenominator
+                                      ? resolvedQuarterDenominator
+                                      : (metricObservationValues[
+                                          source.metricDefinitionId
+                                        ] || "")
+                                  }
+                                  onValueChange={(value) => {
+                                    if (isLockedDenominator) return;
+                                    setMetricObservationValues((current) => ({
+                                      ...current,
+                                      [source.metricDefinitionId]: value,
+                                    }));
+                                  }}
+                                  disabled={isLockedDenominator}
+                                  currency={
+                                    source.metricDefinition?.unitType === "CURRENCY"
+                                  }
+                                  placeholder={isLockedDenominator ? resolvedQuarterDenominator : "Exact decimal value"}
+                                  className={cn(
+                                    "h-10 font-mono text-sm",
+                                    isLockedDenominator
+                                      ? "cursor-not-allowed bg-slate-50 text-slate-700 border-slate-200"
+                                      : "bg-white",
+                                  )}
+                                />
+                                {isLockedDenominator ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 border border-blue-200">
+                                      <span className="inline-block h-2 w-2 rounded-full bg-blue-600" />
+                                      Locked: Approved quarterly quota locked: {resolvedQuarterDenominator} {selectedKpi?.basisUnitType || selectedKpi?.denominatorLabel || "deliverables"}.
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">
+                                      Users can no longer enter arbitrary denominator numbers that skew quarterly rates.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-gray-500">
+                                    {source.metricDefinition?.code}
+                                    {source.metricDefinition?.unitType
+                                      ? ` · ${source.metricDefinition.unitType}`
+                                      : ""}
+                                  </p>
+                                )}
+                              </div>
+                            ) : source.sourceType === "KPI" ? (
+                              <div className="rounded border border-dashed bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                Automatically resolved from the approved source KPI
+                                result. Read-only; no observation is required.
+                              </div>
+                            ) : (
+                              <div className="rounded border border-dashed bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                Exact constant {source.constantValueExact} is preview-only;
+                                no observation is submitted.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Live Calculation Preview for Ratio Formula */}
+                      {formulaRatioPreview && (
+                        <div className="space-y-3 pt-2">
+                          <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-800 dark:bg-blue-950/50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Calculator className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span className="text-sm font-medium text-blue-950 dark:text-blue-100">
+                                  Calculated Result:
                                 </span>
-                              )}
-                              {source.weight !== undefined && (
-                                <span className="rounded bg-indigo-100 px-2 py-1 font-mono text-xs text-indigo-900">
-                                  Weight: {source.weight}%
-                                </span>
-                              )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                  {formulaRatioPreview.calculatedRate.toFixed(2)}
+                                  {selectedKpi?.unitType === "PERCENT" && "%"}
+                                </p>
+                                <p className="text-xs font-mono text-muted-foreground">
+                                  {formulaRatioPreview.numStr} ÷ {formulaRatioPreview.denStr} × {formulaRatioPreview.multiplier}
+                                </p>
+                              </div>
                             </div>
                           </div>
 
-                          {source.sourceType === "METRIC" ? (
-                            <div className="space-y-2">
-                              <Label className="text-xs text-gray-700">
-                                Observed metric value
-                              </Label>
-                              <FormattedNumberInput
-                                autoComplete="off"
-                                value={
-                                  metricObservationValues[
-                                    source.metricDefinitionId
-                                  ] || ""
-                                }
-                                onValueChange={(value) =>
-                                  setMetricObservationValues((current) => ({
-                                    ...current,
-                                    [source.metricDefinitionId]: value,
-                                  }))
-                                }
-                                currency={
-                                  source.metricDefinition?.unitType === "CURRENCY"
-                                }
-                                placeholder="Exact decimal value"
-                                className="h-10 bg-white font-mono text-sm"
-                              />
-                              <p className="text-[11px] text-gray-500">
-                                {source.metricDefinition?.code}
-                                {source.metricDefinition?.unitType
-                                  ? ` · ${source.metricDefinition.unitType}`
-                                  : ""}
+                          {formulaRatioPreview.achievementPercent !== null && (
+                            <div
+                              className={cn(
+                                "rounded-lg border p-4 space-y-2",
+                                getProgressStatusColor(formulaRatioPreview.status),
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Target className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+                                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    Achievement Progress
+                                  </span>
+                                </div>
+                                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                                  {formulaRatioPreview.achievementPercent.toFixed(1)}%
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div
+                                  className={cn(
+                                    "h-full transition-all duration-300 rounded-full",
+                                    formulaRatioPreview.status === "success"
+                                      ? "bg-green-600"
+                                      : formulaRatioPreview.status === "warning"
+                                      ? "bg-amber-600"
+                                      : "bg-red-600",
+                                  )}
+                                  style={{
+                                    width: `${Math.min(formulaRatioPreview.achievementPercent, 100)}%`,
+                                  }}
+                                />
+                              </div>
+
+                              <p className="text-xs text-muted-foreground text-center">
+                                {formulaRatioPreview.achievementPercent >= 100
+                                  ? "🎉 Target achieved!"
+                                  : formulaRatioPreview.achievementPercent >= 75
+                                  ? "Keep going! You're almost there."
+                                  : "Continue working towards your target."}
                               </p>
-                            </div>
-                          ) : source.sourceType === "KPI" ? (
-                            <div className="rounded border border-dashed bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                              Automatically resolved from the approved source KPI
-                              result. Read-only; no observation is required.
-                            </div>
-                          ) : (
-                            <div className="rounded border border-dashed bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                              Exact constant {source.constantValueExact} is preview-only;
-                              no observation is submitted.
                             </div>
                           )}
                         </div>
-                      ))}
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-red-600">
@@ -895,6 +1385,17 @@ export function LogbookEntryDialog({
                       multiplier={boundFormula?.multiplier}
                       unitType={selectedKpi?.unitType || undefined}
                       targetValue={parseFloat(kpiTargetValue) || selectedKpi?.targetValue || undefined}
+                      readOnlyDenominator={Boolean(resolvedQuarterDenominator)}
+                      approvedQuotaMessage={
+                        resolvedQuarterDenominator
+                          ? "Approved quarterly quota locked: " +
+                            resolvedQuarterDenominator +
+                            " " +
+                            (selectedKpi?.basisUnitType ||
+                              selectedKpi?.denominatorLabel ||
+                              "deliverables")
+                          : undefined
+                      }
                     />
                   ) : selectedKpi?.calculationType === "MANUAL_VALUE" ? (
                     // Direct Value Entry
@@ -1017,10 +1518,14 @@ export function LogbookEntryDialog({
           >
             {mutationLoading
               ? editingEntry
-                ? "Updating..."
+                ? isRejectedEntry
+                  ? "Resubmitting..."
+                  : "Saving..."
                 : "Adding..."
               : editingEntry
-                ? "Update Entry"
+                ? isRejectedEntry
+                  ? "Update & Resubmit"
+                  : "Save Changes"
                 : "Add Entry"}
           </Button>
         </div>

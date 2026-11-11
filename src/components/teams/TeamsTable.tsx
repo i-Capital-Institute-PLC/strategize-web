@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQuery } from "@apollo/client";
+import { GET_DIVISIONS } from "@/lib/graphql/queries/divisions";
 import { GET_DEPARTMENTS } from "@/lib/graphql/queries/departments";
 import { GET_EMPLOYEES } from "@/lib/graphql/queries/employees";
 import { MoreHorizontal, Pencil, Trash2, Eye, Users, Plus, Loader2 } from "lucide-react";
@@ -62,9 +63,18 @@ import { useTableColumnControls } from "@/hooks/table/useTableColumnControls";
 interface TeamsTableProps {
   teams: Team[];
   loading: boolean;
+  title?: string;
+  description?: string;
+  entityName?: string;
 }
 
-export default function TeamsTable({ teams, loading }: TeamsTableProps) {
+export default function TeamsTable({
+  teams,
+  loading,
+  title = "Units",
+  description = "Manage organizational units, specialized task forces, and assign unit leads",
+  entityName = "Unit",
+}: TeamsTableProps) {
   const router = useRouter();
   const { createTeam, updateTeam, removeTeam, loading: mutLoading } = useTeamMutations();
 
@@ -75,12 +85,18 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
   const [form, setForm] = useState({
     name: "",
     description: "",
+    divisionId: "none",
     departmentId: "none",
     teamLeadUserId: "none",
     memberIds: [] as string[],
   });
 
-  // Fetch departments for dropdown
+  // Fetch divisions and departments for dropdowns
+  const { data: divsData } = useQuery(GET_DIVISIONS, {
+    variables: { page: 1, limit: 100 },
+  });
+  const divisions = divsData?.divisions?.items || [];
+
   const { data: deptsData } = useQuery(GET_DEPARTMENTS, {
     variables: { page: 1, limit: 100 },
   });
@@ -100,16 +116,20 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
   const employees = empsData?.employees?.items || [];
 
   const resetForm = () =>
-    setForm({ name: "", description: "", departmentId: "none", teamLeadUserId: "none", memberIds: [] });
+    setForm({ name: "", description: "", divisionId: "none", departmentId: "none", teamLeadUserId: "none", memberIds: [] });
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name) return;
     try {
+      const isDivision = form.divisionId && form.divisionId !== "none";
+      const isDepartment = form.departmentId && form.departmentId !== "none";
       await createTeam({
-        ...form,
+        name: form.name,
+        description: form.description || undefined,
         organizationId: getOrganizationId(),
-        departmentId: form.departmentId && form.departmentId !== "none" ? form.departmentId : undefined,
+        divisionId: isDivision && !isDepartment ? form.divisionId : undefined,
+        departmentId: isDepartment && !isDivision ? form.departmentId : undefined,
         teamLeadUserId: form.teamLeadUserId && form.teamLeadUserId !== "none" ? form.teamLeadUserId : undefined,
         memberIds: form.memberIds.length > 0 ? form.memberIds : undefined,
       });
@@ -124,11 +144,14 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
     e.preventDefault();
     if (!editTeam || !form.name) return;
     try {
+      const isDivision = form.divisionId && form.divisionId !== "none";
+      const isDepartment = form.departmentId && form.departmentId !== "none";
       await updateTeam({
         teamId: editTeam.teamId,
         name: form.name,
         description: form.description || undefined,
-        departmentId: form.departmentId && form.departmentId !== "none" ? form.departmentId : undefined,
+        divisionId: isDivision && !isDepartment ? form.divisionId : undefined,
+        departmentId: isDepartment && !isDivision ? form.departmentId : undefined,
         teamLeadUserId: form.teamLeadUserId && form.teamLeadUserId !== "none" ? form.teamLeadUserId : undefined,
         memberIds: form.memberIds.length > 0 ? form.memberIds : undefined,
         organizationId: getOrganizationId(),
@@ -150,13 +173,18 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
     }
   };
 
-  const openEdit = (team: Team) => {
+  const openEdit = (team: any) => {
+    const hasDept = Boolean(team.department?.departmentId || team.departmentId);
+    const hasDiv = Boolean(team.division?.divisionId || team.divisionId);
+    const isDivisionUnit = hasDiv && !hasDept;
+
     setForm({
       name: team.name,
       description: team.description || "",
-      departmentId: team.department?.departmentId || "none",
+      divisionId: isDivisionUnit ? (team.division?.divisionId || team.divisionId || "none") : "none",
+      departmentId: !isDivisionUnit ? (team.department?.departmentId || team.departmentId || "none") : "none",
       teamLeadUserId: team.teamLead?.employeeId || "none",
-      memberIds: team.members?.map(m => m.employee.employeeId) || [],
+      memberIds: team.members?.map((m: any) => m.employee?.employeeId || m.employeeId) || [],
     });
     setEditTeam(team);
   };
@@ -173,7 +201,12 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
       { id: "name", accessor: (team: Team) => team.name },
       {
         id: "department",
-        accessor: (team: Team) => team.department?.name ?? "",
+        accessor: (team: Team) =>
+          team.department?.name
+            ? team.department.name
+            : (team as any).division?.name
+            ? `Direct: ${(team as any).division.name}`
+            : "",
       },
       {
         id: "teamLead",
@@ -217,16 +250,40 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
   }) => {
     // Local state to prevent re-renders from parent
     const [localForm, setLocalForm] = React.useState(form);
+    const [hierarchyType, setHierarchyType] = React.useState<"department" | "division">(() => {
+      if (
+        form.divisionId &&
+        form.divisionId !== "none" &&
+        (!form.departmentId || form.departmentId === "none")
+      ) {
+        return "division";
+      }
+      return "department";
+    });
 
     // Sync with parent form when dialog opens
     React.useEffect(() => {
       setLocalForm(form);
+      if (
+        form.divisionId &&
+        form.divisionId !== "none" &&
+        (!form.departmentId || form.departmentId === "none")
+      ) {
+        setHierarchyType("division");
+      } else {
+        setHierarchyType("department");
+      }
     }, []);
 
     const handleLocalSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Update parent form before submitting
-      setForm(localForm);
+      // Ensure strict mutual exclusivity: only the selected hierarchy parent is preserved
+      const finalForm = {
+        ...localForm,
+        divisionId: hierarchyType === "division" && localForm.divisionId !== "none" ? localForm.divisionId : "none",
+        departmentId: hierarchyType === "department" && localForm.departmentId !== "none" ? localForm.departmentId : "none",
+      };
+      setForm(finalForm);
       // Use setTimeout to ensure state is updated
       setTimeout(() => onSubmit(e), 0);
     };
@@ -234,9 +291,9 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
     return (
       <form onSubmit={handleLocalSubmit} className="space-y-4 mt-2">
         <div className="space-y-2">
-          <Label>Team Name *</Label>
+          <Label>{entityName} Name *</Label>
           <Input
-            placeholder="e.g. Engineering Team, Sales Team"
+            placeholder={`e.g. Specialized Task Force, ${entityName} Alpha`}
             value={localForm.name}
             onChange={(e) => setLocalForm({ ...localForm, name: e.target.value })}
             required
@@ -244,48 +301,120 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
           />
         </div>
 
+        {/* Mutually Exclusive Hierarchy Placement */}
         <div className="space-y-2">
-          <Label>Department</Label>
-          <SearchableSelect
-            value={localForm.departmentId === "none" ? "" : localForm.departmentId}
-            onValueChange={(v) => setLocalForm({ ...localForm, departmentId: v || "none" })}
-            placeholder="Select department (optional)"
-            searchPlaceholder="Search departments..."
-            emptyMessage={departments.length === 0 && !isAdmin ? "No departments available. Contact an admin to create one." : "No departments found"}
-            options={departments.map((dept: any) => ({
-              value: dept.departmentId,
-              label: dept.name,
-            }))}
-            clearable
-            customContent={
-              departments.length === 0 && isAdmin ? (
-                <div className="px-2 py-1.5 pointer-events-auto">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-primary hover:text-primary hover:bg-primary/10 pointer-events-auto"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      router.push("/dashboard/structure?tab=departments&action=add");
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Department
-                  </Button>
-                </div>
-              ) : undefined
-            }
-          />
+          <Label className="text-sm font-medium">Hierarchy Placement (Reports To) *</Label>
+          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <button
+              type="button"
+              onClick={() => {
+                setHierarchyType("department");
+                setLocalForm((prev) => ({ ...prev, divisionId: "none" }));
+              }}
+              className={`flex flex-col items-center justify-center py-2 px-3 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                hierarchyType === "department"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-sm font-semibold"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              }`}
+            >
+              <span>Department</span>
+              <span className="text-[11px] opacity-75 font-normal">Departmental Unit</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setHierarchyType("division");
+                setLocalForm((prev) => ({ ...prev, departmentId: "none" }));
+              }}
+              className={`flex flex-col items-center justify-center py-2 px-3 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                hierarchyType === "division"
+                  ? "bg-white dark:bg-gray-900 text-primary shadow-sm font-semibold"
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              }`}
+            >
+              <span>Division</span>
+              <span className="text-[11px] opacity-75 font-normal">Direct Task Force / Unit</span>
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {hierarchyType === "department"
+              ? "This unit reports to a Department. Division selection is excluded."
+              : "This unit reports directly to a Division as a specialized task force. Department selection is excluded."}
+          </p>
         </div>
 
+        {hierarchyType === "department" ? (
+          <div className="space-y-2">
+            <Label>Department *</Label>
+            <SearchableSelect
+              value={localForm.departmentId === "none" ? "" : localForm.departmentId}
+              onValueChange={(v) => {
+                setLocalForm({
+                  ...localForm,
+                  departmentId: v || "none",
+                  divisionId: "none",
+                });
+              }}
+              placeholder="Select department"
+              searchPlaceholder="Search departments..."
+              emptyMessage={departments.length === 0 && !isAdmin ? "No departments available. Contact an admin to create one." : "No departments found"}
+              options={departments.map((dept: any) => ({
+                value: dept.departmentId,
+                label: dept.division?.name ? `${dept.name} (${dept.division.name})` : dept.name,
+              }))}
+              clearable
+              customContent={
+                departments.length === 0 && isAdmin ? (
+                  <div className="px-2 py-1.5 pointer-events-auto">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-primary hover:text-primary hover:bg-primary/10 pointer-events-auto"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push("/dashboard/structure?tab=departments&action=add");
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      New Department
+                    </Button>
+                  </div>
+                ) : undefined
+              }
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label>Division *</Label>
+            <SearchableSelect
+              value={localForm.divisionId === "none" ? "" : localForm.divisionId}
+              onValueChange={(v) => {
+                setLocalForm({
+                  ...localForm,
+                  divisionId: v || "none",
+                  departmentId: "none",
+                });
+              }}
+              placeholder="Select division (direct task force)"
+              searchPlaceholder="Search divisions..."
+              emptyMessage="No divisions found"
+              options={divisions.map((div: any) => ({
+                value: div.divisionId,
+                label: div.name,
+              }))}
+              clearable
+            />
+          </div>
+        )}
+
         <div className="space-y-2">
-          <Label>Team Lead</Label>
+          <Label>{entityName} Lead</Label>
           <SearchableSelect
             value={localForm.teamLeadUserId === "none" ? "" : localForm.teamLeadUserId}
             onValueChange={(v) => setLocalForm({ ...localForm, teamLeadUserId: v || "none" })}
-            placeholder="Select team lead (optional)"
+            placeholder={`Select ${entityName.toLowerCase()} lead (optional)`}
             searchPlaceholder="Search employees..."
             emptyMessage={employees.length === 0 && !isAdmin ? "No employees available. Contact an admin to add employees." : "No employees found"}
             options={employees.map((emp: any) => ({
@@ -318,11 +447,11 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
         </div>
 
         <div className="space-y-2">
-          <Label>Team Members</Label>
+          <Label>{entityName} Members</Label>
           <MultiSelect
             value={localForm.memberIds}
             onValueChange={(v) => setLocalForm({ ...localForm, memberIds: v })}
-            placeholder="Select team members (optional)"
+            placeholder={`Select ${entityName.toLowerCase()} members (optional)`}
             searchPlaceholder="Search employees..."
             emptyMessage={employees.length === 0 && !isAdmin ? "No employees available. Contact an admin to add employees." : "No employees found"}
             options={employees
@@ -334,7 +463,7 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
               }))}
           />
           <p className="text-xs text-muted-foreground">
-            Team lead is automatically excluded from members
+            {entityName} lead is automatically excluded from members
           </p>
         </div>
 
@@ -378,10 +507,10 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Teams
+            {title}
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Manage teams and assign team leads
+            {description}
           </p>
         </div>
         <Button
@@ -390,7 +519,7 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
             setShowCreate(true);
           }}
         >
-          <Plus className="mr-1.5 h-4 w-4" /> Add Team
+          <Plus className="mr-1.5 h-4 w-4" /> Add {entityName}
         </Button>
       </div>
 
@@ -400,10 +529,10 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
             <Users className="w-8 h-8 text-blue-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            No teams yet
+            No {title.toLowerCase()} yet
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-6">
-            Create your first team to organize employees and track performance.
+            Create your first {entityName.toLowerCase()} under a division or department to organize goals and track performance.
           </p>
           <Button
             onClick={() => {
@@ -411,7 +540,7 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
               setShowCreate(true);
             }}
           >
-            <Plus className="mr-1.5 h-4 w-4" /> Create Team
+            <Plus className="mr-1.5 h-4 w-4" /> Create {entityName}
           </Button>
         </div>
       ) : (
@@ -420,17 +549,17 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
             <TableHeader>
               <TableRow className="bg-gray-50 dark:bg-gray-900/50">
                 <TableHead className="font-semibold">
-                  <SortableFilterableHeader label="Team Name" {...getHeaderProps("name")} />
+                  <SortableFilterableHeader label={`${entityName} Name`} {...getHeaderProps("name")} />
                 </TableHead>
                 <TableHead className="font-semibold">
                   <SortableFilterableHeader
-                    label="Department"
+                    label="Hierarchy / Department"
                     {...getHeaderProps("department")}
                   />
                 </TableHead>
                 <TableHead className="font-semibold">
                   <SortableFilterableHeader
-                    label="Team Lead"
+                    label={`${entityName} Lead`}
                     {...getHeaderProps("teamLead")}
                   />
                 </TableHead>
@@ -487,13 +616,24 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {team.department ? (
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {team.department.name}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
+                    <div className="flex flex-col gap-0.5">
+                      {team.department ? (
+                        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                          {team.department.name}
+                        </span>
+                      ) : (team as any).division ? (
+                        <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                          Direct to {(team as any).division.name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                      {team.department?.division?.name && (
+                        <span className="text-xs text-gray-500">
+                          Division: {team.department.division.name}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {team.teamLead ? (
@@ -576,16 +716,18 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
         </div>
       )}
 
-      {/* Create Team Dialog */}
+      {/* Create Unit Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle className="text-xl">Create Team</DialogTitle>
-            <DialogDescription>Add a new team to your organization.</DialogDescription>
+            <DialogTitle className="text-xl">Create {entityName}</DialogTitle>
+            <DialogDescription>
+              Add a new {entityName.toLowerCase()} directly under a division or department.
+            </DialogDescription>
           </DialogHeader>
           <TeamForm
             onSubmit={handleCreate}
-            submitLabel="Create Team"
+            submitLabel={`Create ${entityName}`}
             isLoading={mutLoading.create}
             onCancel={() => {
               resetForm();
@@ -595,7 +737,7 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Team Dialog */}
+      {/* Edit Unit Dialog */}
       <Dialog
         open={!!editTeam}
         onOpenChange={(open) => {
@@ -607,8 +749,8 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
       >
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle className="text-xl">Edit Team</DialogTitle>
-            <DialogDescription>Update team details.</DialogDescription>
+            <DialogTitle className="text-xl">Edit {entityName}</DialogTitle>
+            <DialogDescription>Update {entityName.toLowerCase()} details.</DialogDescription>
           </DialogHeader>
           <TeamForm
             onSubmit={handleEdit}
@@ -622,14 +764,14 @@ export default function TeamsTable({ teams, loading }: TeamsTableProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Team Dialog */}
+      {/* Delete Unit Dialog */}
       <AlertDialog
         open={!!deleteTeam}
         onOpenChange={(open) => !open && setDeleteTeam(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Team</AlertDialogTitle>
+            <AlertDialogTitle>Delete {entityName}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <strong>&quot;{deleteTeam?.name}&quot;</strong>?
               This action cannot be undone.
