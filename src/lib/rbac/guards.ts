@@ -225,15 +225,16 @@ export function canCreateObjective(
   userRole: EmployeeRole | string | undefined,
   objectiveType: ObjectiveType
 ): AccessCheckResult {
-  const permissionMap: Record<ObjectiveType, Permission> = {
+  const permissionMap: Partial<Record<ObjectiveType, Permission>> = {
     'CORPORATE': 'objectives:create_corporate',
     'DIVISION': 'objectives:create_division',
     'DEPARTMENT': 'objectives:create_department',
     'PERSONNEL': 'objectives:create_personnel',
+    'UNIT': 'objectives:create_department',
   };
 
   const permission = permissionMap[objectiveType];
-  if (hasPermission(userRole, permission)) {
+  if (permission && hasPermission(userRole, permission)) {
     return { allowed: true };
   }
 

@@ -229,6 +229,7 @@ export default function ObjectiveForm() {
         DIVISION: "DIVISION",
         DEPARTMENT: "DEPARTMENT",
         PERSONNEL: "INDIVIDUAL",
+        UNIT: "UNIT",
       };
 
       const inputData: any = {

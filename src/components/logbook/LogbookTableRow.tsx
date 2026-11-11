@@ -47,6 +47,9 @@ export function LogbookTableRow({
     (["DRAFT", "REJECTED"].includes(normalizedStatus) || !item.status);
   const isLocked =
     evidencePending || ["SUBMITTED", "APPROVED"].includes(normalizedStatus);
+  const canEdit =
+    !isLocked &&
+    (["DRAFT", "REJECTED"].includes(normalizedStatus) || !item.status);
   const isBasisDriven =
     item.linkedKpi?.calculationBasisSource === "DIRECT_VALUE" ||
     item.linkedKpi?.calculationBasisSource === "LINKED_KPI";
@@ -174,7 +177,7 @@ export function LogbookTableRow({
                 Submit
               </Button>
             )}
-            {isRejected && (
+            {canEdit && (
               <Button
                 variant="outline"
                 size="sm"
@@ -313,7 +316,7 @@ export function LogbookTableRow({
                     Submit
                   </Button>
                 )}
-                {isRejected && (
+                {canEdit && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -335,7 +338,9 @@ export function LogbookTableRow({
         item={item}
         onEditAchievement={() => {
           setIsSubmitDialogOpen(false);
-          handleEdit();
+          setTimeout(() => {
+            handleEdit();
+          }, 100);
         }}
         onSuccess={() => {
           setIsSubmitDialogOpen(false);

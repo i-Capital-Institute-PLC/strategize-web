@@ -887,19 +887,28 @@ export function LogbookEntryDialog({
 
 
 
+  const isRejectedEntry =
+    Boolean(editingEntry) &&
+    (String(editingEntry?.status || "").toUpperCase() === "REJECTED" ||
+      Boolean(editingEntry?.rejectionReason));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
           <DialogTitle className="text-xl font-semibold">
-            {editingEntry ? "Revise Rejected Logbook Entry" : "Add Logbook Entry"}
+            {editingEntry
+              ? isRejectedEntry
+                ? "Revise Rejected Logbook Entry"
+                : "Edit Logbook Entry"
+              : "Add Logbook Entry"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] px-6 py-6">
           <div className="space-y-5">
             {/* Rejection notice for rejected entries */}
-            {editingEntry?.rejectionReason && (
+            {isRejectedEntry && editingEntry?.rejectionReason && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
                 <p className="text-xs font-semibold text-red-800 dark:text-red-300">
                   Rejection Reason from Approver:
@@ -918,14 +927,14 @@ export function LogbookEntryDialog({
                 Entry Date & Time <span className="text-red-500">*</span>
               </Label>
               <div className="flex gap-2">
-                <Popover open={Boolean(editingEntry) ? false : dateOpen} onOpenChange={(o) => !editingEntry && setDateOpen(o)}>
+                <Popover open={isRejectedEntry ? false : dateOpen} onOpenChange={(o) => !isRejectedEntry && setDateOpen(o)}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      disabled={Boolean(editingEntry)}
+                      disabled={isRejectedEntry}
                       className={cn(
                         "flex-1 h-10 justify-start text-sm font-normal",
-                        editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                        isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4 text-gray-500 shrink-0" />
@@ -955,14 +964,14 @@ export function LogbookEntryDialog({
                   </PopoverContent>
                 </Popover>
 
-                <Popover open={Boolean(editingEntry) ? false : timeOpen} onOpenChange={(o) => !editingEntry && setTimeOpen(o)}>
+                <Popover open={isRejectedEntry ? false : timeOpen} onOpenChange={(o) => !isRejectedEntry && setTimeOpen(o)}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      disabled={Boolean(editingEntry)}
+                      disabled={isRejectedEntry}
                       className={cn(
                         "w-32 h-10 justify-start text-sm font-normal shrink-0",
-                        editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                        isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
                       )}
                     >
                       <ClockIcon className="mr-1.5 h-4 w-4 text-gray-500 shrink-0" />
@@ -999,10 +1008,10 @@ export function LogbookEntryDialog({
                 placeholder="Enter activity title..."
                 value={activity}
                 onChange={(e) => setActivity(e.target.value)}
-                disabled={Boolean(editingEntry)}
+                disabled={isRejectedEntry}
                 className={cn(
                   "h-10 text-sm",
-                  editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                  isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
                 )}
               />
             </div>
@@ -1016,10 +1025,10 @@ export function LogbookEntryDialog({
                 placeholder="Describe what you did..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                disabled={Boolean(editingEntry)}
+                disabled={isRejectedEntry}
                 className={cn(
                   "min-h-[100px] text-sm resize-none",
-                  editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                  isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
                 )}
               />
             </div>
@@ -1052,12 +1061,12 @@ export function LogbookEntryDialog({
               <Select
                 value={linkedKpiId || "none"}
                 onValueChange={handleKpiChange}
-                disabled={Boolean(editingEntry)}
+                disabled={isRejectedEntry}
               >
                 <SelectTrigger
                   className={cn(
                     "h-10 text-sm",
-                    editingEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
+                    isRejectedEntry && "bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed opacity-80"
                   )}
                 >
                   <SelectValue placeholder={kpisLoading ? "Loading your KPIs..." : "Select KPI"} />
@@ -1509,10 +1518,14 @@ export function LogbookEntryDialog({
           >
             {mutationLoading
               ? editingEntry
-                ? "Resubmitting..."
+                ? isRejectedEntry
+                  ? "Resubmitting..."
+                  : "Saving..."
                 : "Adding..."
               : editingEntry
-                ? "Update & Resubmit"
+                ? isRejectedEntry
+                  ? "Update & Resubmit"
+                  : "Save Changes"
                 : "Add Entry"}
           </Button>
         </div>

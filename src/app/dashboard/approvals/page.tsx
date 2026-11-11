@@ -71,11 +71,13 @@ const GET_LOGBOOK_REVIEW_DEPARTMENTS = gql`
     departments(page: $page, limit: $limit) {
       items {
         departmentId
+        headUserId
         head {
           employeeId
         }
         division {
           divisionId
+          headUserId
           head {
             employeeId
           }
@@ -254,7 +256,7 @@ export default function ApprovalsPage() {
         : rawLogbookEntries.filter((entry) =>
             canReviewLogbookOwner(entry.owner, user, reviewDepartments),
           )
-      ).filter((entry) => entry.entryStatus !== "DRAFT"), // Managers must never see draft logbook entries
+      ).filter((entry) => String(entry.entryStatus || "").toUpperCase() !== "DRAFT"), // Managers must never see draft logbook entries
     [rawLogbookEntries, user, reviewDepartments],
   );
 

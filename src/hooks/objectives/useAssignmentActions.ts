@@ -329,15 +329,16 @@ export function useAssignmentActions({
 
       const counts = recipients.reduce<Record<AssigneeType, number>>(
         (totals, recipient) => {
-          totals[recipient.assigneeType] += 1;
+          totals[recipient.assigneeType] = (totals[recipient.assigneeType] || 0) + 1;
           return totals;
         },
-        { DIVISION: 0, DEPARTMENT: 0, PERSONNEL: 0 },
+        { DIVISION: 0, DEPARTMENT: 0, UNIT: 0, PERSONNEL: 0 },
       );
       const cascadeSummary = (
         [
           ["DIVISION", "division"],
           ["DEPARTMENT", "department"],
+          ["UNIT", "unit"],
           ["PERSONNEL", "employee"],
         ] as const
       )

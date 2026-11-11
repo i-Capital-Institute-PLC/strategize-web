@@ -127,8 +127,12 @@ function PersonalLogbookPage() {
   };
 
   const handleEditEntry = (entry: FrontendLogbookItem) => {
-    const status = String(entry.status || "").toUpperCase();
-    if (status !== "REJECTED") return;
+    const status = String(entry.status || "DRAFT").toUpperCase();
+    const isLocked =
+      entry.evidenceApprovalStatus === "PENDING" ||
+      status === "SUBMITTED" ||
+      status === "APPROVED";
+    if (isLocked) return;
     setEditingEntry(entry);
     setIsAddEntryOpen(true);
   };

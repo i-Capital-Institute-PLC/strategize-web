@@ -45,6 +45,9 @@ export function LogbookTableCard({
     (["DRAFT", "REJECTED"].includes(normalizedStatus) || !item.status);
   const isLocked =
     evidencePending || ["SUBMITTED", "APPROVED"].includes(normalizedStatus);
+  const canEdit =
+    !isLocked &&
+    (["DRAFT", "REJECTED"].includes(normalizedStatus) || !item.status);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -232,7 +235,7 @@ export function LogbookTableCard({
                 Submit
               </Button>
             )}
-            {isRejected && (
+            {canEdit && (
               <Button
                 variant="outline"
                 size="sm"
@@ -252,7 +255,9 @@ export function LogbookTableCard({
         item={item}
         onEditAchievement={() => {
           setIsSubmitDialogOpen(false);
-          handleEdit();
+          setTimeout(() => {
+            handleEdit();
+          }, 100);
         }}
         onSuccess={() => {
           setIsSubmitDialogOpen(false);
