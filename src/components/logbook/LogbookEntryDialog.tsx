@@ -378,77 +378,6 @@ export function LogbookEntryDialog({
     boundFormula?.multiplier,
   ]);
 
-  // Live calculation preview for formula ratio KPIs
-  const formulaRatioPreview = useMemo(() => {
-    if (!boundFormula || selectedKpi?.calculationType !== "RATIO_FORMULA") {
-      return null;
-    }
-    const numSource = metricSources.find(
-      (s) => s.side === "NUMERATOR" || s.position === 1,
-    );
-    const denSource = metricSources.find(
-      (s) => s.side === "DENOMINATOR" || s.position === 2,
-    );
-    if (!numSource || !denSource) return null;
-
-    const numVal = metricObservationValues[numSource.metricDefinitionId];
-    const denVal =
-      resolvedQuarterDenominator ||
-      metricObservationValues[denSource.metricDefinitionId];
-
-    const num = parseFloat(numVal || "0");
-    const den = parseFloat(denVal || "0");
-
-    if (isNaN(num) || isNaN(den) || den === 0 || !numVal) {
-      return null;
-    }
-
-    const multiplier = boundFormula.multiplier || 100;
-    const calculatedRate = (num / den) * multiplier;
-    const target =
-      parseFloat(kpiTargetValue) ||
-      selectedKpi?.targetValue ||
-      100;
-    const achievementPercent =
-      target > 0 ? (calculatedRate / target) * 100 : null;
-
-    let status: "success" | "warning" | "danger" = "danger";
-    if (achievementPercent !== null) {
-      if (achievementPercent >= 100) status = "success";
-      else if (achievementPercent >= 75) status = "warning";
-    }
-
-    return {
-      numStr: numVal,
-      denStr: denVal,
-      multiplier,
-      calculatedRate,
-      target,
-      achievementPercent,
-      status,
-    };
-  }, [
-    boundFormula,
-    selectedKpi,
-    formulaSources,
-    metricObservationValues,
-    resolvedQuarterDenominator,
-    kpiTargetValue,
-  ]);
-
-  const getProgressStatusColor = (status: "success" | "warning" | "danger") => {
-    switch (status) {
-      case "success":
-        return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/50";
-      case "warning":
-        return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/50";
-      case "danger":
-        return "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/50";
-      default:
-        return "";
-    }
-  };
-
   // Resolve active fiscal quarter number
   const currentQuarterNumber = useMemo(() => {
     if (resultEntryContext?.quarterNumber) return resultEntryContext.quarterNumber;
@@ -484,14 +413,89 @@ export function LogbookEntryDialog({
       const val = Number(timelineTarget.target);
       if (!isNaN(val)) return val;
     }
+    if (selectedKpi?.targetValue != null) {
+      return selectedKpi.unitType === "PERCENT" || selectedKpi.unitType === "RATIO"
+        ? Number(selectedKpi.targetValue)
+        : Number(selectedKpi.targetValue) / 4;
+    }
     if (kpiTargetValue && !isNaN(parseFloat(kpiTargetValue))) {
       return parseFloat(kpiTargetValue);
     }
-    if (selectedKpi?.targetValue != null) {
-      return Number(selectedKpi.targetValue) / 4;
-    }
     return 0;
   }, [selectedKpi, activeQuarterPlan, currentQuarterNumber, kpiTargetValue]);
+
+  // Live calculation preview for formula ratio KPIs
+  const formulaRatioPreview = useMemo(() => {
+    if (!boundFormula || selectedKpi?.calculationType !== "RATIO_FORMULA") {
+      return null;
+    }
+    const numSource = metricSources.find(
+      (s) => s.side === "NUMERATOR" || s.position === 1,
+    );
+    const denSource = metricSources.find(
+      (s) => s.side === "DENOMINATOR" || s.position === 2,
+    );
+    if (!numSource || !denSource) return null;
+
+    const numVal = metricObservationValues[numSource.metricDefinitionId];
+    const denVal =
+      resolvedQuarterDenominator ||
+      metricObservationValues[denSource.metricDefinitionId];
+
+    const num = parseFloat(numVal || "0");
+    const den = parseFloat(denVal || "0");
+
+    if (isNaN(num) || isNaN(den) || den === 0 || !numVal) {
+      return null;
+    }
+
+    const multiplier = boundFormula.multiplier || 100;
+    const calculatedRate = (num / den) * multiplier;
+    const target =
+      (liveQuarterTarget && liveQuarterTarget > 0 ? liveQuarterTarget : null) ||
+      parseFloat(kpiTargetValue) ||
+      selectedKpi?.targetValue ||
+      100;
+    const achievementPercent =
+      target > 0 ? (calculatedRate / target) * 100 : null;
+
+    let status: "success" | "warning" | "danger" = "danger";
+    if (achievementPercent !== null) {
+      if (achievementPercent >= 100) status = "success";
+      else if (achievementPercent >= 75) status = "warning";
+    }
+
+    return {
+      numStr: numVal,
+      denStr: denVal,
+      multiplier,
+      calculatedRate,
+      target,
+      achievementPercent,
+      status,
+    };
+  }, [
+    boundFormula,
+    selectedKpi,
+    formulaSources,
+    metricObservationValues,
+    resolvedQuarterDenominator,
+    liveQuarterTarget,
+    kpiTargetValue,
+  ]);
+
+  const getProgressStatusColor = (status: "success" | "warning" | "danger") => {
+    switch (status) {
+      case "success":
+        return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/50";
+      case "warning":
+        return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/50";
+      case "danger":
+        return "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/50";
+      default:
+        return "";
+    }
+  };
 
   // Live Annual Target
   const liveAnnualTarget = useMemo(() => {
@@ -681,8 +685,29 @@ export function LogbookEntryDialog({
     if (isLogbookFormulaCalculationType(selectedKpi?.calculationType)) {
       setKpiAchievedValue("");
     }
-    if (selectedKpi?.targetValue != null) {
-      setKpiTargetValue(String(selectedKpi.targetValue));
+    if (selectedKpi) {
+      const qPlan = (selectedKpi as any)?.quarterPlans?.find(
+        (q: any) => q.quarterNumber === currentQuarterNumber,
+      );
+      const timelineTarget = (selectedKpi as any)?.targets?.find((t: any) =>
+        t.timeline && (
+          t.timeline.toUpperCase().endsWith("-Q" + currentQuarterNumber) ||
+          t.timeline.toUpperCase().endsWith("Q" + currentQuarterNumber)
+        ),
+      );
+      const qTarget =
+        qPlan?.effectiveTarget != null
+          ? String(qPlan.effectiveTarget)
+          : qPlan?.directBasisTarget != null
+            ? String(qPlan.directBasisTarget)
+            : timelineTarget?.target != null
+              ? String(timelineTarget.target)
+              : selectedKpi.targetValue != null
+                ? selectedKpi.unitType === "PERCENT" || selectedKpi.unitType === "RATIO"
+                  ? String(selectedKpi.targetValue)
+                  : String(Number(selectedKpi.targetValue) / 4)
+                : "";
+      setKpiTargetValue(qTarget);
     } else if (!nextKpiId) {
       setKpiTargetValue("");
       setKpiAchievedValue("");
@@ -710,7 +735,9 @@ export function LogbookEntryDialog({
       !isFormulaKpi && !isBasisDrivenKpi && kpiAchievedValue
         ? Number(kpiAchievedValue)
         : null;
-    const target = kpiTargetValue ? Number(kpiTargetValue) : null;
+    const target =
+      (liveQuarterTarget && liveQuarterTarget > 0 ? liveQuarterTarget : null) ||
+      (kpiTargetValue ? Number(kpiTargetValue) : null);
     const basisAvailable =
       actualBasisSource === "ENTER_ACTUAL_BASIS"
         ? Number(kpiActualBasisExact) > 0
@@ -1384,7 +1411,7 @@ export function LogbookEntryDialog({
                       }}
                       multiplier={boundFormula?.multiplier}
                       unitType={selectedKpi?.unitType || undefined}
-                      targetValue={parseFloat(kpiTargetValue) || selectedKpi?.targetValue || undefined}
+                      targetValue={liveQuarterTarget || parseFloat(kpiTargetValue) || selectedKpi?.targetValue || undefined}
                       readOnlyDenominator={Boolean(resolvedQuarterDenominator)}
                       approvedQuotaMessage={
                         resolvedQuarterDenominator
@@ -1402,7 +1429,7 @@ export function LogbookEntryDialog({
                     <DirectValueInputSection
                       value={kpiAchievedValue}
                       onChange={setKpiAchievedValue}
-                      targetValue={parseFloat(kpiTargetValue) || selectedKpi?.targetValue || undefined}
+                      targetValue={liveQuarterTarget || parseFloat(kpiTargetValue) || selectedKpi?.targetValue || undefined}
                       unitType={selectedKpi?.unitType || undefined}
                       measurementUnit={selectedKpi?.measurementUnit || undefined}
                       label="Achievement Value"
