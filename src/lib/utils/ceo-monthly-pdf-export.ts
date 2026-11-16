@@ -188,12 +188,12 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
         doc.setFontSize(7);
         doc.setTextColor(100, 116, 139);
         doc.text(
-          "* Adjusted achievement = Current actual + previous period closing deviation   |   Closing deviation = Adjusted achievement - current period target.",
+          "* Additive Measures: Adjusted achievement = Current actual + previous period closing deviation   |   Closing deviation = Adjusted achievement - current period target.",
           36,
           finalY,
         );
         doc.text(
-          "* Monthly target for rate/percentage measures is held constant at target (e.g. 90%) without quarterly division.",
+          "* Rate/Percentage Measures: Evaluated purely on current period actual (Prev. Deviation = 0, Monthly target held constant at target, Achievement floored at 0%).",
           36,
           finalY + 9,
         );

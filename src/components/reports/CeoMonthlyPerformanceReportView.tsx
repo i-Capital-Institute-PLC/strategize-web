@@ -568,7 +568,7 @@ export default function CeoMonthlyPerformanceReportView() {
                 <strong>Mathematical Specifications:</strong> Adjusted Achievement = Current Month Actual + Previous Month Deviation &middot; Closing Deviation = Adjusted Achievement &minus; Monthly Target (1/3 Q).
               </p>
               <p>
-                <strong>Deviation Carry-Over Policy:</strong> Closing deviation is carried over continuously month-to-month and across quarter boundaries. For rate/percentage measures, the monthly target stays fixed at target (e.g. 90%) without quarterly division.
+                <strong>Deviation Carry-Over Policy:</strong> Closing deviation carries over continuously across months and quarters for additive volume measures. For rate/percentage measures (margins, rates), they are evaluated on current period performance (Prev. Deviation = 0, Achievement floored at 0%).
               </p>
             </div>
           </div>
