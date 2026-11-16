@@ -84,10 +84,10 @@ describe("CEO Monthly PDF Export Utility", () => {
         annualTarget: 120,
         monthlyTarget: 10, // 30 / 3 = 10
         previousMonthDeviation: -2,
+        adjustedAchievement: 12, // 10 - (-2) = 12 (underachievement adds to requirement)
         currentMonthActual: 9,
-        adjustedAchievement: 7,
-        closingDeviation: -3,
-        achievementPercentage: 70,
+        closingDeviation: -3, // 9 - 12 = -3
+        achievementPercentage: 75,
       },
     ],
   };
@@ -136,10 +136,10 @@ describe("CEO Monthly PDF Export Utility", () => {
     expect(row2[3]).toBe("120");
     expect(row2[4]).toBe("10");
     expect(row2[5]).toBe("-2");
-    expect(row2[6]).toBe("7"); // Adjusted Achievement
+    expect(row2[6]).toBe("12"); // Adjusted Achievement (10 - (-2))
     expect(row2[7]).toBe("9"); // Current Actual
-    expect(row2[8]).toBe("-3");
-    expect(row2[9]).toBe("70%");
+    expect(row2[8]).toBe("-3"); // Closing Deviation (9 - 12)
+    expect(row2[9]).toBe("75%");
 
     // Saved with standard executive file naming
     expect(mockSave).toHaveBeenCalledWith(
