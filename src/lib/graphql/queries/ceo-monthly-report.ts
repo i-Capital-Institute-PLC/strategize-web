@@ -16,6 +16,7 @@ export const GET_CEO_MONTHLY_PERFORMANCE_REPORT = gql`
         unitName
         unitType
         annualTarget
+        quarterBasePlan
         monthlyTarget
         previousMonthDeviation
         currentMonthActual

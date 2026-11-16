@@ -9,6 +9,7 @@ export interface CeoMonthlyPdfItem {
   unitName: string;
   unitType: string;
   annualTarget: number;
+  quarterBasePlan: number;
   monthlyTarget: number;
   previousMonthDeviation: number;
   currentMonthActual: number;
@@ -54,13 +55,14 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
   doc.setFillColor(245, 130, 32); // #F58220 iCapital Orange
   doc.rect(36, 66, pageWidth - 72, 2.5, "F");
 
-  // Table Columns matching template (with Adjusted Achievement before Current Actual)
+  // Table Columns matching template (with Base Plan for Quarter, and Adjusted Achievement before Current Actual)
   const headers = [
     [
       "Strategic Objective",
       "Performance Measure (KPI)",
       "Unit / Direct Report",
       "Annual Target",
+      "Quarter Base Plan",
       "Monthly Target (1/3 Q)",
       "Prev. Month Deviation",
       "Adjusted Achievement",
@@ -100,6 +102,7 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
       item.kpiName,
       item.unitName || item.assigneeType,
       formatNumber(item.annualTarget, isRate),
+      formatNumber(item.quarterBasePlan, isRate),
       formatNumber(item.monthlyTarget, isRate),
       formatDeviation(item.previousMonthDeviation),
       formatNumber(item.adjustedAchievement, isRate),
@@ -135,20 +138,21 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
       fillColor: [250, 248, 250],
     },
     columnStyles: {
-      0: { cellWidth: 100, halign: "left" },  // Strategic Objective
-      1: { cellWidth: 140, halign: "left" },  // KPI Name
-      2: { cellWidth: 95, halign: "left" },   // Unit
-      3: { cellWidth: 54, halign: "right" },  // Annual Target
-      4: { cellWidth: 62, halign: "right" },  // Monthly Target
-      5: { cellWidth: 62, halign: "right" },  // Prev Dev
-      6: { cellWidth: 58, halign: "right" },  // Actual
-      7: { cellWidth: 62, halign: "right" },  // Adj Ach
-      8: { cellWidth: 62, halign: "right" },  // Closing Dev
-      9: { cellWidth: 70, halign: "right", fontStyle: "bold" }, // Ach %
+      0: { cellWidth: 90, halign: "left" },   // Strategic Objective
+      1: { cellWidth: 125, halign: "left" },  // KPI Name
+      2: { cellWidth: 85, halign: "left" },   // Unit
+      3: { cellWidth: 50, halign: "right" },  // Annual Target
+      4: { cellWidth: 54, halign: "right" },  // Quarter Base Plan
+      5: { cellWidth: 54, halign: "right" },  // Monthly Target
+      6: { cellWidth: 54, halign: "right" },  // Prev Dev
+      7: { cellWidth: 54, halign: "right" },  // Adj Ach
+      8: { cellWidth: 50, halign: "right" },  // Actual
+      9: { cellWidth: 54, halign: "right" },  // Closing Dev
+      10: { cellWidth: 58, halign: "right", fontStyle: "bold" }, // Ach %
     },
     didParseCell: (dataCell) => {
       // Highlight Achievement % column based on performance
-      if (dataCell.section === "body" && dataCell.column.index === 9) {
+      if (dataCell.section === "body" && dataCell.column.index === 10) {
         const rawText = String(dataCell.cell.raw || "");
         const val = parseFloat(rawText.replace("%", "").replace(/,/g, ""));
         if (!isNaN(val)) {
@@ -162,7 +166,7 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
         }
       }
       // Highlight Closing Deviation column
-      if (dataCell.section === "body" && dataCell.column.index === 8) {
+      if (dataCell.section === "body" && dataCell.column.index === 9) {
         const rawText = String(dataCell.cell.raw || "");
         if (rawText.startsWith("-")) {
           dataCell.cell.styles.textColor = [220, 38, 38]; // Red

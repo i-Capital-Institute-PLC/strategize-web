@@ -453,6 +453,9 @@ export default function CeoMonthlyPerformanceReportView() {
                       Annual Target
                     </TableHead>
                     <TableHead className="font-bold text-white text-right">
+                      Quarter Base Plan
+                    </TableHead>
+                    <TableHead className="font-bold text-white text-right">
                       Monthly Target (1/3 Q)
                     </TableHead>
                     <TableHead className="font-bold text-white text-right">
@@ -499,6 +502,10 @@ export default function CeoMonthlyPerformanceReportView() {
                         </TableCell>
                         <TableCell className="text-xs text-right font-medium tabular-nums">
                           {item.annualTarget.toLocaleString()}
+                          {isPercentage ? "%" : ""}
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-medium tabular-nums text-slate-700 dark:text-zinc-300">
+                          {item.quarterBasePlan.toLocaleString()}
                           {isPercentage ? "%" : ""}
                         </TableCell>
                         <TableCell className="text-xs text-right font-medium tabular-nums text-indigo-700 dark:text-indigo-400">

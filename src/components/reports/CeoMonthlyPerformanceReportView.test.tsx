@@ -21,6 +21,7 @@ const mockReportData = {
         unitName: "Digital and AI Solution",
         unitType: "PERCENT",
         annualTarget: 90,
+        quarterBasePlan: 90,
         monthlyTarget: 90,
         previousMonthDeviation: 0,
         currentMonthActual: 91,

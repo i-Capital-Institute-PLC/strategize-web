@@ -67,6 +67,7 @@ describe("CEO Monthly PDF Export Utility", () => {
         unitName: "Digital and AI Solution",
         unitType: "PERCENT",
         annualTarget: 90,
+        quarterBasePlan: 90,
         monthlyTarget: 90, // Policy: stays 90%
         previousMonthDeviation: 0,
         currentMonthActual: 92,
@@ -82,6 +83,7 @@ describe("CEO Monthly PDF Export Utility", () => {
         unitName: "Finance and Portfolio",
         unitType: "NUMBER",
         annualTarget: 120,
+        quarterBasePlan: 30,
         monthlyTarget: 10, // 30 / 3 = 10
         previousMonthDeviation: -2,
         adjustedAchievement: 12, // 10 - (-2) = 12 (underachievement adds to requirement)
@@ -92,7 +94,7 @@ describe("CEO Monthly PDF Export Utility", () => {
     ],
   };
 
-  it("exports a landscape PDF with the 9 executive columns matching iCapital template", () => {
+  it("exports a landscape PDF with the 11 executive columns matching iCapital template", () => {
     mockSave.mockClear();
     capturedAutoTableConfig = null;
 
@@ -104,6 +106,7 @@ describe("CEO Monthly PDF Export Utility", () => {
       "Performance Measure (KPI)",
       "Unit / Direct Report",
       "Annual Target",
+      "Quarter Base Plan",
       "Monthly Target (1/3 Q)",
       "Prev. Month Deviation",
       "Adjusted Achievement",
@@ -121,12 +124,13 @@ describe("CEO Monthly PDF Export Utility", () => {
     expect(row1[1]).toBe("Operational Excellence Rate (%)");
     expect(row1[2]).toBe("Digital and AI Solution");
     expect(row1[3]).toBe("90%");
-    expect(row1[4]).toBe("90%");
-    expect(row1[5]).toBe("0");
-    expect(row1[6]).toBe("92%"); // Adjusted Achievement
-    expect(row1[7]).toBe("92%"); // Current Actual
-    expect(row1[8]).toBe("+2");
-    expect(row1[9]).toBe("102.22%");
+    expect(row1[4]).toBe("90%"); // Quarter Base Plan
+    expect(row1[5]).toBe("90%"); // Monthly Target
+    expect(row1[6]).toBe("0");   // Prev Dev
+    expect(row1[7]).toBe("92%"); // Adjusted Achievement
+    expect(row1[8]).toBe("92%"); // Current Actual
+    expect(row1[9]).toBe("+2");  // Closing Dev
+    expect(row1[10]).toBe("102.22%");
 
     // Row 2 (Additive KPI with negative closing deviation)
     const row2 = capturedAutoTableConfig.body[1];
@@ -134,12 +138,13 @@ describe("CEO Monthly PDF Export Utility", () => {
     expect(row2[1]).toBe("Total Portfolio Revenue (M ETB)");
     expect(row2[2]).toBe("Finance and Portfolio");
     expect(row2[3]).toBe("120");
-    expect(row2[4]).toBe("10");
-    expect(row2[5]).toBe("-2");
-    expect(row2[6]).toBe("12"); // Adjusted Achievement (10 - (-2))
-    expect(row2[7]).toBe("9"); // Current Actual
-    expect(row2[8]).toBe("-3"); // Closing Deviation (9 - 12)
-    expect(row2[9]).toBe("75%");
+    expect(row2[4]).toBe("30"); // Quarter Base Plan
+    expect(row2[5]).toBe("10"); // Monthly Target
+    expect(row2[6]).toBe("-2"); // Prev Dev
+    expect(row2[7]).toBe("12"); // Adjusted Achievement (10 - (-2))
+    expect(row2[8]).toBe("9");  // Current Actual
+    expect(row2[9]).toBe("-3"); // Closing Deviation (9 - 12)
+    expect(row2[10]).toBe("75%");
 
     // Saved with standard executive file naming
     expect(mockSave).toHaveBeenCalledWith(
