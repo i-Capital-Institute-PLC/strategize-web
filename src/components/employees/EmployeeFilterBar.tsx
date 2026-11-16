@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -35,38 +35,6 @@ const EmployeeFilterBar: React.FC<EmployeeFilterBarProps> = ({
   placeholder = "Search employees...",
   disabled = false,
 }) => {
-  const [internalSearchValue, setInternalSearchValue] = useState(searchValue);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Sync internal state with props
-  useEffect(() => {
-    setInternalSearchValue(searchValue);
-  }, [searchValue]);
-
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
-
-  // Debounced search handler
-  const handleSearchChange = (value: string) => {
-    setInternalSearchValue(value);
-
-    // Clear existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Set new timer for debounced search
-    debounceTimerRef.current = setTimeout(() => {
-      onSearchChange?.(value);
-    }, 350); // 350ms debounce
-  };
-
   // Filter change handler
   const handleFilterChange = (value: FilterStatus) => {
     onFilterChange?.(value);
@@ -79,19 +47,11 @@ const EmployeeFilterBar: React.FC<EmployeeFilterBarProps> = ({
 
   // Clear search handler
   const handleClearSearch = () => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    setInternalSearchValue("");
     onSearchChange?.("");
   };
 
   // Clear filters handler
   const handleClearFilters = () => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    setInternalSearchValue("");
     onSearchChange?.("");
     onFilterChange?.("all");
     onSortChange?.("none");
@@ -99,7 +59,7 @@ const EmployeeFilterBar: React.FC<EmployeeFilterBarProps> = ({
 
   // Check if any filters are active
   const hasActiveFilters =
-    internalSearchValue.trim() !== "" ||
+    searchValue.trim() !== "" ||
     filterValue !== "all" ||
     sortValue !== "none";
 
@@ -113,14 +73,14 @@ const EmployeeFilterBar: React.FC<EmployeeFilterBarProps> = ({
         <Input
           type="text"
           placeholder={placeholder}
-          value={internalSearchValue}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          value={searchValue}
+          onChange={(e) => onSearchChange?.(e.target.value)}
           disabled={disabled}
           className="flex-1 border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
         />
 
         {/* Clear Search Button */}
-        {internalSearchValue && (
+        {searchValue && (
           <Button
             variant="ghost"
             size="sm"
