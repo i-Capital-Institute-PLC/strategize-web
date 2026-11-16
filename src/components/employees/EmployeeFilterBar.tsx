@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -36,29 +36,35 @@ const EmployeeFilterBar: React.FC<EmployeeFilterBarProps> = ({
   disabled = false,
 }) => {
   const [internalSearchValue, setInternalSearchValue] = useState(searchValue);
-  const [searchDebounceTimer, setSearchDebounceTimer] =
-    useState<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync internal state with props
   useEffect(() => {
     setInternalSearchValue(searchValue);
   }, [searchValue]);
 
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   // Debounced search handler
   const handleSearchChange = (value: string) => {
     setInternalSearchValue(value);
 
     // Clear existing timer
-    if (searchDebounceTimer) {
-      clearTimeout(searchDebounceTimer);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
 
     // Set new timer for debounced search
-    const newTimer = setTimeout(() => {
+    debounceTimerRef.current = setTimeout(() => {
       onSearchChange?.(value);
-    }, 300); // 300ms debounce
-
-    setSearchDebounceTimer(newTimer);
+    }, 350); // 350ms debounce
   };
 
   // Filter change handler
@@ -73,12 +79,18 @@ const EmployeeFilterBar: React.FC<EmployeeFilterBarProps> = ({
 
   // Clear search handler
   const handleClearSearch = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
     setInternalSearchValue("");
     onSearchChange?.("");
   };
 
   // Clear filters handler
   const handleClearFilters = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
     setInternalSearchValue("");
     onSearchChange?.("");
     onFilterChange?.("all");

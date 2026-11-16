@@ -170,8 +170,8 @@ const EmployeesPage = () => {
       (emp: { role?: string }) => emp.role === EmployeeRole.MANAGER
     ) || [];
 
-  // Show loading while checking permissions or fetching the scoped employee page.
-  if (permissionsLoading || (canAccessEmployees && loading)) {
+  // Show loading while checking permissions or fetching the initial scoped employee page.
+  if (permissionsLoading || (canAccessEmployees && loading && !data)) {
     return (
       <div className="flex flex-col gap-6 px-2 md:px-6 py-8">
         <div className="animate-pulse">
@@ -233,7 +233,7 @@ const EmployeesPage = () => {
               searchValue={searchTerm}
               filterValue={filterStatus}
               sortValue={sortOrder}
-              disabled={loading}
+              disabled={false}
             />
             <div className="flex gap-2 items-center justify-end sm:justify-start">
               {canAddEmployee && (
