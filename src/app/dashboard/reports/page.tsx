@@ -10,6 +10,7 @@ import {
   KPIPerformanceAnalytics,
   QuarterlyPerformanceReport,
   SupportPerformanceReport,
+  CeoMonthlyPerformanceReportView,
 } from "@/components/reports";
 import UnifiedPerformanceReport from "@/components/reports/UnifiedPerformanceReport";
 import { exportReport } from "@/lib/utils/exportReport";
@@ -27,7 +28,8 @@ import {
   Zap,
   TrendingDown,
   Minus,
-  Network
+  Network,
+  FileText,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useAuthStore, useStrategicPeriodStore } from "@/stores";
@@ -92,6 +94,9 @@ function ReportsContent() {
   
   const managerRoles = new Set(["MANAGER", "DIRECTOR", "CEO", "SUPER_ADMIN", "ADMIN", "HR"]);
   const isManager = !!user?.role && managerRoles.has(user.role as string);
+
+  const isExecutiveMonthlyAllowed =
+    user?.role === "CEO" || user?.role === "SUPER_ADMIN";
 
   // Fetch performance summary for metrics
   const { data: summaryData, loading: summaryLoading } = useQuery(GET_REPORTS_SUMMARY, {
@@ -210,6 +215,7 @@ function ReportsContent() {
       raw === "my-submissions" ? "submissions" : raw;
     if (paramTab && !(user?.role === 'CEO' && paramTab === 'submissions')) return paramTab;
 
+    if (user?.role === "CEO") return "ceo-monthly";
     if (hasFullAccess) return "kpi-performance";
     if (isManager) return "performance";
     return "individual";
@@ -600,6 +606,18 @@ function ReportsContent() {
               aria-label="Report navigation"
               className="flex w-full flex-wrap gap-1 bg-transparent p-0"
             >
+              {/* CEO Direct-Reports Monthly Report - CEO and Super Admin (Deputy CEO) only */}
+              {isExecutiveMonthlyAllowed && (
+                <TabsTrigger
+                  value="ceo-monthly"
+                  className="flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-[#7A4069] data-[state=active]:shadow-sm dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-indigo-400 sm:text-sm"
+                >
+                  <FileText className="h-4 w-4 text-[#F58220]" />
+                  <span className="hidden sm:inline">CEO Monthly Report</span>
+                  <span className="sm:hidden">CEO Monthly</span>
+                </TabsTrigger>
+              )}
+
               {/* Quarterly KPI Performance - server-scoped for every role */}
               <TabsTrigger
                 value="quarterly"
@@ -669,6 +687,17 @@ function ReportsContent() {
           </div>
 
           <div className="p-4 sm:p-6">
+            {/* CEO Direct-Reports Monthly Report (CEO & Super Admin Only) */}
+            {isExecutiveMonthlyAllowed && visitedTabs.has("ceo-monthly") && (
+              <TabsContent
+                value="ceo-monthly"
+                forceMount
+                className={activeTab === "ceo-monthly" ? "space-y-6" : "hidden"}
+              >
+                <CeoMonthlyPerformanceReportView />
+              </TabsContent>
+            )}
+
             {/* KPI Performance Analytics (Full Access Only) */}
             {hasFullAccess && visitedTabs.has("kpi-performance") && (
               <TabsContent
