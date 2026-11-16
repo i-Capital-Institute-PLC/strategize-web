@@ -106,8 +106,8 @@ describe("CEO Monthly PDF Export Utility", () => {
       "Annual Target",
       "Monthly Target (1/3 Q)",
       "Prev. Month Deviation",
-      "Current Actual",
       "Adjusted Achievement",
+      "Current Actual",
       "Closing Deviation",
       "Achievement (%)",
     ]);
@@ -123,8 +123,8 @@ describe("CEO Monthly PDF Export Utility", () => {
     expect(row1[3]).toBe("90%");
     expect(row1[4]).toBe("90%");
     expect(row1[5]).toBe("0");
-    expect(row1[6]).toBe("92%");
-    expect(row1[7]).toBe("92%");
+    expect(row1[6]).toBe("92%"); // Adjusted Achievement
+    expect(row1[7]).toBe("92%"); // Current Actual
     expect(row1[8]).toBe("+2");
     expect(row1[9]).toBe("102.22%");
 
@@ -136,8 +136,8 @@ describe("CEO Monthly PDF Export Utility", () => {
     expect(row2[3]).toBe("120");
     expect(row2[4]).toBe("10");
     expect(row2[5]).toBe("-2");
-    expect(row2[6]).toBe("9");
-    expect(row2[7]).toBe("7");
+    expect(row2[6]).toBe("7"); // Adjusted Achievement
+    expect(row2[7]).toBe("9"); // Current Actual
     expect(row2[8]).toBe("-3");
     expect(row2[9]).toBe("70%");
 

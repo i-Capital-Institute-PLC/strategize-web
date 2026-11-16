@@ -54,7 +54,7 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
   doc.setFillColor(245, 130, 32); // #F58220 iCapital Orange
   doc.rect(36, 66, pageWidth - 72, 2.5, "F");
 
-  // Table Columns matching template
+  // Table Columns matching template (with Adjusted Achievement before Current Actual)
   const headers = [
     [
       "Strategic Objective",
@@ -63,8 +63,8 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
       "Annual Target",
       "Monthly Target (1/3 Q)",
       "Prev. Month Deviation",
-      "Current Actual",
       "Adjusted Achievement",
+      "Current Actual",
       "Closing Deviation",
       "Achievement (%)",
     ],
@@ -102,8 +102,8 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
       formatNumber(item.annualTarget, isRate),
       formatNumber(item.monthlyTarget, isRate),
       formatDeviation(item.previousMonthDeviation),
-      formatNumber(item.currentMonthActual, isRate),
       formatNumber(item.adjustedAchievement, isRate),
+      formatNumber(item.currentMonthActual, isRate),
       formatDeviation(item.closingDeviation),
       formatNumber(item.achievementPercentage, true),
     ];

@@ -459,10 +459,10 @@ export default function CeoMonthlyPerformanceReportView() {
                       Prev. Deviation
                     </TableHead>
                     <TableHead className="font-bold text-white text-right">
-                      Current Actual
+                      Adjusted Ach.
                     </TableHead>
                     <TableHead className="font-bold text-white text-right">
-                      Adjusted Ach.
+                      Current Actual
                     </TableHead>
                     <TableHead className="font-bold text-white text-right">
                       Closing Deviation
@@ -517,12 +517,12 @@ export default function CeoMonthlyPerformanceReportView() {
                           {item.previousMonthDeviation > 0 ? "+" : ""}
                           {item.previousMonthDeviation.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-xs text-right font-medium tabular-nums">
-                          {item.currentMonthActual.toLocaleString()}
-                          {isPercentage ? "%" : ""}
-                        </TableCell>
                         <TableCell className="text-xs text-right font-semibold tabular-nums text-slate-900 dark:text-zinc-100">
                           {item.adjustedAchievement.toLocaleString()}
+                          {isPercentage ? "%" : ""}
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-medium tabular-nums">
+                          {item.currentMonthActual.toLocaleString()}
                           {isPercentage ? "%" : ""}
                         </TableCell>
                         <TableCell
