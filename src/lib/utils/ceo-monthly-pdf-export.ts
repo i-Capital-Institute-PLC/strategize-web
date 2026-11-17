@@ -48,7 +48,7 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139); // Slate-500
-  const metaText = `The iCapital Africa Group · CEO Direct Reports · ${data.calendarMonth} (FY ${data.fiscalYear} Q${data.quarterNumber} Month ${data.monthInQuarter})`;
+  const metaText = `The iCapital Africa Group · ${data.calendarMonth} (FY ${data.fiscalYear} Q${data.quarterNumber} Month ${data.monthInQuarter})`;
   doc.text(metaText, 36, 58);
 
   // Orange brand accent bar
@@ -183,27 +183,6 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
 
-    // Bottom Footnotes on the last page
-    if (i === totalPages) {
-      const lastTable = (doc as any).lastAutoTable;
-      const finalY = lastTable ? lastTable.finalY + 12 : pageHeight - 60;
-      if (finalY < pageHeight - 35) {
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        doc.text(
-          "* Additive Measures: Adjusted achievement = Current actual + previous period closing deviation   |   Closing deviation = Adjusted achievement - current period target.",
-          36,
-          finalY,
-        );
-        doc.text(
-          "* Rate/Percentage Measures: Evaluated purely on current period actual (Prev. Deviation = 0, Monthly target held constant at target, Achievement floored at 0%).",
-          36,
-          finalY + 9,
-        );
-      }
-    }
-
     // Bottom Branding Footer
     doc.setDrawColor(226, 232, 240);
     doc.line(36, pageHeight - 30, pageWidth - 36, pageHeight - 30);
@@ -213,14 +192,6 @@ export function exportCeoMonthlyReportPDF(data: CeoMonthlyPdfReportData) {
     doc.setFontSize(8.5);
     doc.setTextColor(122, 64, 105);
     doc.text("The iCapital Africa Group", 36, pageHeight - 16);
-
-    // Center: Confidential Executive Report
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text("CONFIDENTIAL · CEO DIRECT-REPORTS EXECUTIVE MONTHLY REPORT", pageWidth / 2, pageHeight - 16, {
-      align: "center",
-    });
 
     // Right: Page number
     doc.setFont("helvetica", "normal");

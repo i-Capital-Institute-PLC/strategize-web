@@ -199,7 +199,7 @@ export default function CeoMonthlyPerformanceReportView() {
               2. Performance Summary
             </h2>
             <p className="max-w-2xl text-xs text-slate-200 sm:text-sm">
-              CEO Direct-Reports Monthly Operational Tracking with cumulative closing deviation carry-over
+              Monthly Operational Tracking with cumulative closing deviation carry-over
               across corporate divisions and executive departments.
             </p>
           </div>
@@ -565,21 +565,6 @@ export default function CeoMonthlyPerformanceReportView() {
             </div>
           )}
         </CardContent>
-
-        {/* Footnotes & Formula Information Banner */}
-        <div className="border-t border-slate-100 bg-slate-50/80 p-4 text-xs text-slate-500 dark:border-zinc-800 dark:bg-zinc-900/60">
-          <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 shrink-0 text-slate-400 mt-0.5" />
-            <div className="space-y-1">
-              <p>
-                <strong>Mathematical Specifications:</strong> Adjusted Achievement = Current Month Actual + Previous Month Deviation &middot; Closing Deviation = Adjusted Achievement &minus; Monthly Target (1/3 Q).
-              </p>
-              <p>
-                <strong>Deviation Carry-Over Policy:</strong> Closing deviation carries over continuously across months and quarters for additive volume measures. For rate/percentage measures (margins, rates), they are evaluated on current period performance (Prev. Deviation = 0, Achievement floored at 0%).
-              </p>
-            </div>
-          </div>
-        </div>
       </Card>
     </div>
   );
