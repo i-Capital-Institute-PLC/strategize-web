@@ -1,20 +1,26 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@apollo/client";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users, Layers } from "lucide-react";
 import DepartmentDetailsTable from "@/components/departments/DepartmentDetailsTable";
-import { GET_DEPARTMENT } from "@/lib/graphql/queries/departments";
-import type { Department } from "@/types/graphql";
+import DepartmentHoldingPoolManager from "@/components/departments/DepartmentHoldingPoolManager";
+import { GET_DEPARTMENT, GET_DEPARTMENTS } from "@/lib/graphql/queries/departments";
+import type { Department, PaginatedDepartments } from "@/types/graphql";
 
 interface DepartmentData {
   department: Department;
+}
+
+interface DepartmentsData {
+  departments: PaginatedDepartments;
 }
 
 const DepartmentDetailsPage = () => {
   const router = useRouter();
   const params = useParams();
   const departmentId = params.departmentId as string;
+  const [activeTab, setActiveTab] = useState<"members" | "holding-pool">("members");
 
   // Fetch department details
   const {
@@ -27,7 +33,17 @@ const DepartmentDetailsPage = () => {
     nextFetchPolicy: "cache-first",
   });
 
+  // Fetch all departments for cross-department transfer selector
+  const { data: allDeptsData } = useQuery<DepartmentsData>(GET_DEPARTMENTS, {
+    variables: { limit: 100 },
+    fetchPolicy: "cache-first",
+  });
+
   const department = departmentData?.department;
+  const allDepartments = (allDeptsData?.departments?.items || []).map((d) => ({
+    departmentId: d.departmentId,
+    name: d.name,
+  }));
 
   if (loading) {
     return (
@@ -141,10 +157,47 @@ const DepartmentDetailsPage = () => {
         </div>
       </div>
 
-      {/* Department Details Table */}
-      <div className="dark:bg-muted rounded-lg border overflow-x-auto custom-scrollbar">
-        <DepartmentDetailsTable department={department} loading={false} />
+      {/* View Tabs */}
+      <div className="flex border-b border-gray-200 dark:border-gray-800 space-x-6">
+        <button
+          type="button"
+          onClick={() => setActiveTab("members")}
+          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === "members"
+              ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Overview & Members
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("holding-pool")}
+          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === "holding-pool"
+              ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          Holding Pool & Target Rebalance
+        </button>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === "members" ? (
+        <div className="dark:bg-muted rounded-lg border overflow-x-auto custom-scrollbar">
+          <DepartmentDetailsTable department={department} loading={false} />
+        </div>
+      ) : (
+        <DepartmentHoldingPoolManager
+          departmentId={department.departmentId}
+          departmentName={department.name}
+          employees={department.employees || []}
+          allDepartments={allDepartments}
+        />
+      )}
     </div>
   );
 };

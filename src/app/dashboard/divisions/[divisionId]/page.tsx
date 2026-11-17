@@ -3,10 +3,11 @@ import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@apollo/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Building2, Layers } from "lucide-react";
 import DivisionDetailsTable from "@/components/divisions/DivisionDetailsTable";
 import DivisionPagination from "@/components/divisions/DivisionPagination";
 import AddDepartmentDialog from "@/components/departments/AddDepartmentDialog";
+import DivisionHoldingPoolManager from "@/components/divisions/DivisionHoldingPoolManager";
 import { GET_DIVISION_BASIC } from "@/lib/graphql/queries/divisions";
 import { GET_DEPARTMENTS } from "@/lib/graphql/queries/departments";
 import { GET_EMPLOYEES } from "@/lib/graphql/queries/employees";
@@ -27,6 +28,7 @@ const DivisionDetailsPage = () => {
   const divisionId = params.divisionId as string;
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [activeMainTab, setActiveMainTab] = useState<"departments" | "holding-pool">("departments");
 
   // Get permissions to check if user can access employees
   const { guards } = usePermissions();
@@ -199,45 +201,91 @@ const DivisionDetailsPage = () => {
           >
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
-          <h1 className="text-2xl md:text-4xl text-[#3F3F46] font-bold tracking-tight">
-            {divisionName}
-          </h1>
+          <div>
+            <h1 className="text-2xl md:text-4xl text-[#3F3F46] font-bold tracking-tight">
+              {divisionName}
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Division Management, Quotas & Department Allocation
+            </p>
+          </div>
         </div>
-        <Button onClick={handleAddDepartment} disabled={loading}>
-          <Plus width={16} height={16} />
-          Add Department
-        </Button>
+        {activeMainTab === "departments" && (
+          <Button onClick={handleAddDepartment} disabled={loading}>
+            <Plus width={16} height={16} />
+            Add Department
+          </Button>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="dark:bg-muted rounded-lg border overflow-x-auto custom-scrollbar">
-        <DivisionDetailsTable
+      {/* Main View Tabs */}
+      <div className="flex border-b border-gray-200 dark:border-gray-800 space-x-6">
+        <button
+          type="button"
+          onClick={() => setActiveMainTab("departments")}
+          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+            activeMainTab === "departments"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          Departments & Overview
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMainTab("holding-pool")}
+          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+            activeMainTab === "holding-pool"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          Division Holding Pool & Inter-Dept Rebalance
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeMainTab === "departments" ? (
+        <>
+          {/* Table */}
+          <div className="dark:bg-muted rounded-lg border overflow-x-auto custom-scrollbar">
+            <DivisionDetailsTable
+              departments={departments}
+              loading={loading}
+              error={divisionError ? String(divisionError) : undefined}
+              managers={managers.map((m) => ({
+                employeeId: m.employeeId,
+                fullName: m.fullName,
+              }))}
+              divisions={[{ divisionId: divisionId, name: divisionName }]}
+              allMembers={allEmployees.map((e) => ({
+                employeeId: e.employeeId,
+                fullName: e.fullName,
+              }))}
+              onEditSuccess={() => refetchDepartments()}
+              onDeleteSuccess={() => refetchDepartments()}
+            />
+          </div>
+
+          {/* Pagination */}
+          <DivisionPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+            loading={loading}
+          />
+        </>
+      ) : (
+        <DivisionHoldingPoolManager
+          divisionId={divisionId}
+          divisionName={divisionName}
           departments={departments}
-          loading={loading}
-          error={divisionError ? String(divisionError) : undefined}
-          managers={managers.map((m) => ({
-            employeeId: m.employeeId,
-            fullName: m.fullName,
-          }))}
-          divisions={[{ divisionId: divisionId, name: divisionName }]}
-          allMembers={allEmployees.map((e) => ({
-            employeeId: e.employeeId,
-            fullName: e.fullName,
-          }))}
-          onEditSuccess={() => refetchDepartments()}
-          onDeleteSuccess={() => refetchDepartments()}
         />
-      </div>
-
-      {/* Pagination */}
-      <DivisionPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        itemsPerPage={itemsPerPage}
-        onPageChange={handlePageChange}
-        loading={loading}
-      />
+      )}
 
       {/* Add Department Dialog */}
       <AddDepartmentDialog
