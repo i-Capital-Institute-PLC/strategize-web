@@ -29,7 +29,7 @@ const DepartmentDetailsPage = () => {
     error,
   } = useQuery<DepartmentData>(GET_DEPARTMENT, {
     variables: { departmentId },
-    fetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
   });
 
@@ -194,7 +194,7 @@ const DepartmentDetailsPage = () => {
         <DepartmentHoldingPoolManager
           departmentId={department.departmentId}
           departmentName={department.name}
-          employees={department.employees || []}
+          employees={(department.employees || []).filter((e: any) => e.status !== "DISABLED" && e.status !== "DELETED")}
           allDepartments={allDepartments}
         />
       )}
