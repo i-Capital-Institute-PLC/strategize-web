@@ -58,7 +58,7 @@ import { format } from "date-fns";
 interface DepartmentHoldingPoolManagerProps {
   departmentId: string;
   departmentName: string;
-  employees: Array<{ employeeId: string; fullName: string; title?: string }>;
+  employees: Array<{ employeeId: string; fullName: string; title?: string; status?: string }>;
   allDepartments?: Array<{ departmentId: string; name: string }>;
 }
 
@@ -165,6 +165,45 @@ export default function DepartmentHoldingPoolManager({
   const pendingClearances = useMemo(() => {
     return clearances.filter((c: any) => c.status === "PENDING");
   }, [clearances]);
+
+  // Set of employee IDs who have already departed (approved clearance)
+  const departedEmpIds = useMemo(() => {
+    return new Set(
+      clearances
+        .filter((c: any) => c.status === "APPROVED")
+        .map((c: any) => c.employee?.employeeId || c.employeeId)
+        .filter(Boolean),
+    );
+  }, [clearances]);
+
+  // Set of employee IDs who currently have a pending departure request
+  const pendingDepartureEmpIds = useMemo(() => {
+    return new Set(
+      clearances
+        .filter((c: any) => c.status === "PENDING")
+        .map((c: any) => c.employee?.employeeId || c.employeeId)
+        .filter(Boolean),
+    );
+  }, [clearances]);
+
+  // Active employees who are still with the department and available for target assignments
+  const activeEmployees = useMemo(() => {
+    return employees.filter((emp: any) => {
+      const isDeparted = departedEmpIds.has(emp.employeeId);
+      const isInactive = emp.status === "DISABLED" || emp.status === "DELETED";
+      return !isDeparted && !isInactive;
+    });
+  }, [employees, departedEmpIds]);
+
+  // Employees eligible to be submitted for departure (not already departed and not pending)
+  const departureEligibleEmployees = useMemo(() => {
+    return employees.filter((emp: any) => {
+      const isDeparted = departedEmpIds.has(emp.employeeId);
+      const isPending = pendingDepartureEmpIds.has(emp.employeeId);
+      const isInactive = emp.status === "DISABLED" || emp.status === "DELETED";
+      return !isDeparted && !isPending && !isInactive;
+    });
+  }, [employees, departedEmpIds, pendingDepartureEmpIds]);
 
   // Determine whether current logged-in user has HR clearance privileges
   const isHrUser = useMemo(() => {
@@ -1266,7 +1305,7 @@ export default function DepartmentHoldingPoolManager({
                   <SelectValue placeholder="Choose an employee..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((emp) => (
+                  {departureEligibleEmployees.map((emp) => (
                     <SelectItem key={emp.employeeId} value={emp.employeeId}>
                       {emp.fullName} {emp.title ? `(${emp.title})` : ""}
                     </SelectItem>
@@ -1387,7 +1426,7 @@ export default function DepartmentHoldingPoolManager({
                   <SelectValue placeholder="Choose an employee..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((emp) => (
+                  {activeEmployees.map((emp) => (
                     <SelectItem key={emp.employeeId} value={emp.employeeId}>
                       {emp.fullName} {emp.title ? `(${emp.title})` : ""}
                     </SelectItem>
@@ -1496,9 +1535,9 @@ export default function DepartmentHoldingPoolManager({
                   <SelectValue placeholder="Choose an employee..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((emp) => (
+                  {activeEmployees.map((emp) => (
                     <SelectItem key={emp.employeeId} value={emp.employeeId}>
-                      {emp.fullName}
+                      {emp.fullName} {emp.title ? `(${emp.title})` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1577,7 +1616,7 @@ export default function DepartmentHoldingPoolManager({
                   <SelectValue placeholder="Choose an employee..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((emp) => (
+                  {activeEmployees.map((emp) => (
                     <SelectItem key={emp.employeeId} value={emp.employeeId}>
                       {emp.fullName} {emp.title ? `(${emp.title})` : ""}
                     </SelectItem>
