@@ -481,6 +481,25 @@ export default function DepartmentHoldingPoolManager({
       toast.error("Please select an employee, enter target amount, and write a reason.");
       return;
     }
+
+    const activeQuarterPool = selectedKpiForDist?.quarters?.find(
+      (q: any) => q.quarterNumber === selectedQuarterForDist,
+    );
+    const maxAvailable = activeQuarterPool?.poolBalance ?? 0;
+    const isPercentageKpi = selectedKpiForDist ? isPercent(selectedKpiForDist) : false;
+
+    if (!isPercentageKpi && quotaDelta > maxAvailable) {
+      toast.error(
+        `Cannot assign more than available pool balance (${formatTargetWithUnit(maxAvailable, selectedKpiForDist)}).`,
+      );
+      return;
+    }
+
+    if (isPercentageKpi && quotaDelta > 100) {
+      toast.error("Percentage target cannot exceed 100%.");
+      return;
+    }
+
     try {
       const res = await distributeQuota({
         variables: {
@@ -1448,9 +1467,9 @@ export default function DepartmentHoldingPoolManager({
             {/* Notice for Percentage vs Financial KPI */}
             {selectedKpiForDist && isPercent(selectedKpiForDist) && (
               <div className="rounded-xl p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300">
-                <p className="font-bold">Percentage Goal Notice:</p>
+                <p className="font-bold">Percentage Standard Notice:</p>
                 <p className="mt-0.5 text-[11px]">
-                  This is a rate/percentage goal ({selectedKpiForDist.measurementUnit || "%"}). Assigning {quotaDelta || 75}% sets this performance standard for the selected employee.
+                  Percentage goals ({selectedKpiForDist.measurementUnit || "%"}) represent an individual quality or operational standard (0% – 100%), not an additive cash sum. Assigning this applies the required performance standard to the selected employee.
                 </p>
               </div>
             )}
@@ -1489,14 +1508,23 @@ export default function DepartmentHoldingPoolManager({
                 </Label>
                 {selectedKpiForDist && (
                   <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    Available: {formatTargetWithUnit(selectedKpiForDist.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? quotaDelta, selectedKpiForDist)}
+                    Available in Pool: {formatTargetWithUnit(selectedKpiForDist.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? quotaDelta, selectedKpiForDist)}
                   </span>
                 )}
               </div>
               <div className="relative">
                 <Input
                   type="number"
-                  className="pr-16"
+                  min={0}
+                  max={selectedKpiForDist && isPercent(selectedKpiForDist) ? 100 : (selectedKpiForDist?.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? undefined)}
+                  className={`pr-16 ${
+                    (!selectedKpiForDist || !isPercent(selectedKpiForDist)) &&
+                    quotaDelta > (selectedKpiForDist?.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? 0)
+                      ? "border-rose-500 focus-visible:ring-rose-500"
+                      : selectedKpiForDist && isPercent(selectedKpiForDist) && quotaDelta > 100
+                      ? "border-rose-500 focus-visible:ring-rose-500"
+                      : ""
+                  }`}
                   value={quotaDelta}
                   onChange={(e) => setQuotaDelta(parseFloat(e.target.value) || 0)}
                 />
@@ -1504,6 +1532,18 @@ export default function DepartmentHoldingPoolManager({
                   {selectedKpiForDist ? getKpiUnitLabel(selectedKpiForDist) : "Units"}
                 </span>
               </div>
+              {selectedKpiForDist &&
+                !isPercent(selectedKpiForDist) &&
+                quotaDelta > (selectedKpiForDist?.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? 0) && (
+                  <p className="mt-1.5 text-xs text-rose-600 font-medium">
+                    ⚠️ Cannot assign more than available pool balance ({formatTargetWithUnit(selectedKpiForDist?.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? 0, selectedKpiForDist)}).
+                  </p>
+                )}
+              {selectedKpiForDist && isPercent(selectedKpiForDist) && quotaDelta > 100 && (
+                <p className="mt-1.5 text-xs text-rose-600 font-medium">
+                  ⚠️ Percentage standard cannot exceed 100%.
+                </p>
+              )}
             </div>
 
             {/* Proration Toggle */}
@@ -1564,10 +1604,24 @@ export default function DepartmentHoldingPoolManager({
             </Button>
             <Button
               onClick={handleDistributeQuota}
-              disabled={distributing}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={
+                distributing ||
+                !recipientEmpId ||
+                quotaDelta <= 0 ||
+                ((!selectedKpiForDist || !isPercent(selectedKpiForDist)) &&
+                  quotaDelta > (selectedKpiForDist?.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? 0)) ||
+                (Boolean(selectedKpiForDist && isPercent(selectedKpiForDist)) && quotaDelta > 100)
+              }
+              className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
             >
-              {distributing ? "Assigning..." : `Assign ${selectedKpiForDist ? formatTargetWithUnit(quotaDelta, selectedKpiForDist) : "Targets"}`}
+              {distributing
+                ? "Assigning..."
+                : (!selectedKpiForDist || !isPercent(selectedKpiForDist)) &&
+                  quotaDelta > (selectedKpiForDist?.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? 0)
+                ? "Amount Exceeds Pool"
+                : selectedKpiForDist && isPercent(selectedKpiForDist) && quotaDelta > 100
+                ? "Exceeds 100%"
+                : `Assign ${selectedKpiForDist ? formatTargetWithUnit(quotaDelta, selectedKpiForDist) : "Targets"}`}
             </Button>
           </DialogFooter>
         </DialogContent>
