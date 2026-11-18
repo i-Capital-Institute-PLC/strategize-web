@@ -23,11 +23,21 @@ import {
   EmployeeRole,
 } from "@/types/graphql";
 
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = React.useState(value);
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [delay, value]);
+  return debounced;
+}
+
 const EmployeesPage = () => {
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebouncedValue(searchTerm, 350);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "active" | "inactive"
   >("all");
@@ -53,16 +63,17 @@ const EmployeesPage = () => {
   const hasOrganizationWideAccess = isAdmin || role === EmployeeRole.HR;
 
   // The backend scopes this query to the caller's role and managed organization unit.
-  const { data, loading, error } = useQuery<{
+  const { data, previousData, loading, error } = useQuery<{
     employees: PaginatedEmployees;
   }>(GET_EMPLOYEES, {
     variables: {
       page: currentPage,
       limit: itemsPerPage,
-      search: searchTerm || undefined,
+      search: debouncedSearch.trim() || undefined,
     },
     errorPolicy: "all",
     skip: !canAccessEmployees,
+    notifyOnNetworkStatusChange: true,
   });
 
   // Fetch divisions for department creation
@@ -78,12 +89,13 @@ const EmployeesPage = () => {
   const { createDepartment, loading: departmentMutationLoading } =
     useDepartmentMutations();
 
+  const employeeData = data ?? previousData;
   const rawEmployees = React.useMemo(
-    () => data?.employees?.items || [],
-    [data],
+    () => employeeData?.employees?.items || [],
+    [employeeData],
   );
 
-  const meta = data?.employees?.meta;
+  const meta = employeeData?.employees?.meta;
   const totalPages = meta?.totalPages || 1;
   const totalItems = meta?.totalItems || 0;
 
@@ -170,8 +182,8 @@ const EmployeesPage = () => {
       (emp: { role?: string }) => emp.role === EmployeeRole.MANAGER
     ) || [];
 
-  // Show loading while checking permissions or fetching the scoped employee page.
-  if (permissionsLoading || (canAccessEmployees && loading)) {
+  // Show loading while checking initial permissions.
+  if (permissionsLoading) {
     return (
       <div className="flex flex-col gap-6 px-2 md:px-6 py-8">
         <div className="animate-pulse">
@@ -223,7 +235,7 @@ const EmployeesPage = () => {
 
       {/* Only show filter bar and actions when there's data or loading */}
       {/* Always show search and filter controls, except when there are truly no employees */}
-      {!(filteredEmployees.length === 0 && !searchTerm && !loading && !error) && (
+      {!(filteredEmployees.length === 0 && !searchTerm && !debouncedSearch && !loading && !error) && (
         <>
           <div className="flex flex-col gap-3 sm:gap-4">
             <EmployeeFilterBar
@@ -233,7 +245,7 @@ const EmployeesPage = () => {
               searchValue={searchTerm}
               filterValue={filterStatus}
               sortValue={sortOrder}
-              disabled={loading}
+              disabled={false}
             />
             <div className="flex gap-2 items-center justify-end sm:justify-start">
               {canAddEmployee && (
@@ -300,7 +312,7 @@ const EmployeesPage = () => {
       )}
 
       {/* Empty State or Table */}
-      {!loading && !error && rawEmployees.length === 0 && !searchTerm ? (
+      {!loading && !error && rawEmployees.length === 0 && !searchTerm && !debouncedSearch ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh] sm:min-h-[60vh] text-center px-4">
           <Image
             src="/images/dashboard/objective-empty.png"

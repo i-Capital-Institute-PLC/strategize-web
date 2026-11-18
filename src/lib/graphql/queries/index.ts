@@ -4,3 +4,4 @@ export * from './submissions';
 export * from './departments';
 export * from './divisions';
 export * from './employees';
+export * from './ceo-monthly-report';
