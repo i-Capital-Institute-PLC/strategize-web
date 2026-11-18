@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, UploadIcon, XIcon, ClockIcon, Calculator, Target } from "lucide-react";
+import { CalendarIcon, UploadIcon, XIcon, ClockIcon, Calculator, Target, AlertCircle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
@@ -392,6 +392,15 @@ export function LogbookEntryDialog({
     );
   }, [selectedKpi, currentQuarterNumber]);
 
+  // Check if KPI is retired/zeroed out for current quarter due to role promotion/transfer
+  const isRetiredKpi = useMemo(() => {
+    if (!selectedKpi || !activeQuarterPlan) return false;
+    return (
+      Number(activeQuarterPlan.effectiveTarget) === 0 &&
+      Number(activeQuarterPlan.originalTarget) === 0
+    );
+  }, [selectedKpi, activeQuarterPlan]);
+
   // Live Quarter Target
   const liveQuarterTarget = useMemo(() => {
     if (!selectedKpi) return 0;
@@ -727,6 +736,13 @@ export function LogbookEntryDialog({
     ) {
       toast.error(
         "Please select a strategic period before adding a logbook entry",
+      );
+      return;
+    }
+
+    if (isRetiredKpi) {
+      toast.error(
+        `This KPI was retired for Quarter ${currentQuarterNumber} due to role promotion/transfer. Quota was rebalanced to the department holding pool. Please log achievements under your active role KPIs.`,
       );
       return;
     }
@@ -1142,6 +1158,15 @@ export function LogbookEntryDialog({
                 />
               )}
 
+              {linkedKpiId && isRetiredKpi && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                  <span>
+                    <strong>Retired Role KPI:</strong> Target for Quarter {currentQuarterNumber} was rebalanced to the department holding pool upon role promotion/transfer. New entries cannot be logged against this retired KPI.
+                  </span>
+                </div>
+              )}
+
               {linkedKpiId && isFormulaKpi ? (
                 <div className="space-y-4 rounded-md border border-indigo-200 bg-indigo-50/50 p-4">
                   <div>
@@ -1540,7 +1565,7 @@ export function LogbookEntryDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={mutationLoading}
+            disabled={mutationLoading || isRetiredKpi}
             className="sm:w-auto bg-[#3838EC] hover:bg-[#2d2dbd] text-white"
           >
             {mutationLoading

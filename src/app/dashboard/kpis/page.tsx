@@ -83,8 +83,16 @@ export default function KpisPage() {
     ? kpis.filter((k) => k.kpiType === typeFilter)
     : kpis;
 
+  const isOffboarded = user?.status === "DISABLED";
+
   return (
     <div className="space-y-6">
+      {isOffboarded && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 shadow-2xs dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+          <strong>Account Offboarded:</strong> Your historical KPI assignments and quarter results are preserved. Creating, editing, or reassigning KPIs is closed.
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -111,7 +119,15 @@ export default function KpisPage() {
         </div>
         <div className="flex items-center gap-2">
           <SyncButton onSync={handleSyncKpis} label="Sync" />
-          <Button onClick={() => setShowCreate(true)}>
+          <Button
+            disabled={isOffboarded}
+            title={isOffboarded ? "KPI creation is closed for offboarded accounts." : undefined}
+            onClick={() => {
+              if (isOffboarded) return;
+              setShowCreate(true);
+            }}
+            className={isOffboarded ? "opacity-50 cursor-not-allowed" : ""}
+          >
             <Plus className="mr-1.5 h-4 w-4" /> New KPI
           </Button>
         </div>

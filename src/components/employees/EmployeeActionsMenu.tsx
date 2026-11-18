@@ -6,11 +6,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, Building2, Eye } from "lucide-react";
+import { MoreVertical, Edit, Trash2, Building2, Eye, Award } from "lucide-react";
 import DeleteEmployeeDialog from "./DeleteEmployeeDialog";
 import EditEmployeeDialog from "./EditEmployeeDialog";
 import ViewEmployeeDialog from "./ViewEmployeeDialog";
 import AddToDepartmentDialog from "./AddToDepartmentDialog";
+import PromoteEmployeeDialog from "./PromoteEmployeeDialog";
 import { Employee as GraphQLEmployee } from "@/types/graphql";
 
 const EmployeeActionsMenu = ({
@@ -49,6 +50,17 @@ const EmployeeActionsMenu = ({
               View
             </DropdownMenuItem>
           </ViewEmployeeDialog>
+        )}
+        {originalEmployee && originalEmployee.status !== "DISABLED" && (
+          <PromoteEmployeeDialog employee={originalEmployee}>
+            <DropdownMenuItem
+              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 font-medium"
+              onSelect={(e) => e.preventDefault()}
+            >
+              <Award className="h-4 w-4" />
+              Promote / Change Role
+            </DropdownMenuItem>
+          </PromoteEmployeeDialog>
         )}
         {employeeId && employeeName && canBeAddedToDepartment && (
           <AddToDepartmentDialog

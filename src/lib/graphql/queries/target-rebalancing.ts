@@ -143,6 +143,12 @@ export const GET_DEPARTURE_CLEARANCE_REQUESTS = gql`
       effectiveDate
       reason
       status
+      requestType
+      destinationDepartmentId
+      destinationDepartment {
+        departmentId
+        name
+      }
       reviewedById
       reviewedAt
       rejectionReason
@@ -172,4 +178,3 @@ export const GET_DEPARTURE_CLEARANCE_REQUESTS = gql`
     }
   }
 `;
-

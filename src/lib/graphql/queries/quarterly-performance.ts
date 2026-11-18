@@ -214,6 +214,7 @@ export const GET_KPI_QUARTER_PERFORMANCE_REPORT = gql`
         departmentName
         employeeId
         employeeName
+        employeeStatus
         kpiMode
         aggregationMethod
         weightingBasisKpiId

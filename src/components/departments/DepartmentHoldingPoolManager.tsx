@@ -54,6 +54,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { format } from "date-fns";
+import PromoteEmployeeDialog from "@/components/employees/PromoteEmployeeDialog";
 
 interface DepartmentHoldingPoolManagerProps {
   departmentId: string;
@@ -210,6 +211,16 @@ export default function DepartmentHoldingPoolManager({
     });
   }, [employees, departedEmpIds]);
 
+  const selectedEmpForTransition = useMemo(() => {
+    if (!transitionEmpId) return null;
+    const emp = activeEmployees.find((e) => e.employeeId === transitionEmpId);
+    if (!emp) return null;
+    return {
+      ...emp,
+      departments: [{ departmentId, name: departmentName }],
+    };
+  }, [transitionEmpId, activeEmployees, departmentId, departmentName]);
+
   // Employees eligible to be submitted for departure (not already departed and not pending)
   const departureEligibleEmployees = useMemo(() => {
     return employees.filter((emp: any) => {
@@ -240,13 +251,19 @@ export default function DepartmentHoldingPoolManager({
   const isCurrency = (kpi: any) => {
     const type = (kpi?.unitType || "").toUpperCase();
     const unit = (kpi?.measurementUnit || "").toUpperCase();
+    const name = (kpi?.kpiName || kpi?.name || "").toUpperCase();
     return (
       type === "CURRENCY" ||
       type === "MONETARY" ||
       unit.includes("ETB") ||
       unit.includes("BIRR") ||
       unit.includes("USD") ||
-      unit.includes("$")
+      unit.includes("$") ||
+      unit.includes("CURRENCY") ||
+      name.includes("PIPELINE VALUE") ||
+      name.includes("REVENUE") ||
+      (name.includes("VALUE") && !isPercent(kpi)) ||
+      Number(kpi?.annualDepartmentTarget || 0) >= 1000000
     );
   };
 
@@ -405,8 +422,8 @@ export default function DepartmentHoldingPoolManager({
     }
   };
 
-  // Handle HR Approval (Releases unachieved targets to holding pool)
-  const handleApproveDeparture = async (requestId: string, employeeName: string) => {
+  // Handle HR Approval (Releases unachieved targets to holding pool / executes transfer)
+  const handleApproveDeparture = async (requestId: string, employeeName: string, isTransfer?: boolean) => {
     try {
       const res = await approveDeparture({
         variables: {
@@ -418,15 +435,22 @@ export default function DepartmentHoldingPoolManager({
       if (res.data?.approveDepartureClearance?.success) {
         const swept = res.data.approveDepartureClearance.sweptAmount;
         const amountStr = swept > 0 ? ` (${formatCurrency(swept)})` : "";
-        toast.success(
-          `Departure clearance approved for ${employeeName}! Unachieved targets${amountStr} moved to the Holding Pool.`
-        );
+        if (isTransfer) {
+          toast.success(
+            `Transfer approved for ${employeeName}! Employee transferred to destination department, unworked targets${amountStr} swept to holding pool, and all parties notified.`
+          );
+        } else {
+          toast.success(
+            `Departure clearance approved for ${employeeName}! Unachieved targets${amountStr} moved to the Holding Pool.`
+          );
+        }
         refetchPool();
         refetchLedger();
         refetchClearances();
+        onEmployeeTransferred?.();
       }
     } catch (err: any) {
-      toast.error(err.message || "Could not approve departure clearance.");
+      toast.error(err.message || "Could not approve clearance.");
     }
   };
 
@@ -446,8 +470,13 @@ export default function DepartmentHoldingPoolManager({
         },
       });
       if (res.data?.rejectDepartureClearance) {
+        const isTransfer =
+          selectedClearanceToReject.requestType === "TRANSFER" ||
+          selectedClearanceToReject.reason?.startsWith("[INTERNAL_TRANSFER:");
         toast.success(
-          `Departure clearance for ${selectedClearanceToReject.employee?.fullName || "employee"} rejected.`
+          `${isTransfer ? "Transfer request" : "Departure clearance"} for ${
+            selectedClearanceToReject.employee?.fullName || "employee"
+          } rejected.`
         );
         setRejectDialogOpen(false);
         setSelectedClearanceToReject(null);
@@ -455,7 +484,7 @@ export default function DepartmentHoldingPoolManager({
         refetchClearances();
       }
     } catch (err: any) {
-      toast.error(err.message || "Could not reject departure clearance.");
+      toast.error(err.message || "Could not reject clearance.");
     }
   };
 
@@ -551,37 +580,36 @@ export default function DepartmentHoldingPoolManager({
     }
   };
 
-  // Handle Internal Transfer
+  // Handle Internal Transfer (Routes through HR Approval clearance workflow)
   const handleInternalTransfer = async () => {
     if (!transferEmpId || !toDepartmentId || !transferReason) {
       toast.error("Please select an employee, destination department, and reason.");
       return;
     }
     try {
-      const res = await processTransfer({
+      const res = await requestDeparture({
         variables: {
           input: {
             employeeId: transferEmpId,
-            fromDepartmentId: departmentId,
-            toDepartmentId,
+            departmentId,
             annualStrategicPeriodId,
             effectiveDate: transferDate,
-            reason: transferReason,
+            reason: `[INTERNAL_TRANSFER:toDepartmentId=${toDepartmentId}] ${transferReason}`,
           },
         },
       });
-      if (res.data?.processInternalTransfer?.success) {
-        toast.success(res.data.processInternalTransfer.message || "Employee transferred successfully.");
+      if (res.data?.requestDepartureClearance) {
+        toast.success(
+          "Transfer request submitted! Notification sent to HR for approval."
+        );
         setTransferOpen(false);
         setTransferEmpId("");
         setToDepartmentId("");
         setTransferReason("");
-        refetchPool();
-        refetchLedger();
-        onEmployeeTransferred?.();
+        refetchClearances();
       }
     } catch (err: any) {
-      toast.error(err.message || "Could not transfer employee.");
+      toast.error(err.message || "Could not submit transfer request.");
     }
   };
 
@@ -837,7 +865,7 @@ export default function DepartmentHoldingPoolManager({
         </div>
       )}
 
-      {/* Pending Departure Clearance Alert Banner */}
+      {/* Pending Departure Clearance & Transfer Alert Banner */}
       {pendingClearances.length > 0 && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50/80 dark:border-amber-800/70 dark:bg-amber-950/20 p-5 shadow-xs space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-amber-200/80 dark:border-amber-800/40 pb-3">
@@ -847,15 +875,15 @@ export default function DepartmentHoldingPoolManager({
               </div>
               <div>
                 <h4 className="text-sm font-bold text-amber-950 dark:text-amber-200 flex items-center gap-2">
-                  Pending HR Departure Clearance
+                  Pending HR Approvals & Clearances
                   <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200">
                     {pendingClearances.length} waiting
                   </span>
                 </h4>
                 <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
                   {isHrUser
-                    ? "As HR Officer, review and approve or reject the following employee departure requests to release unachieved targets."
-                    : "Submitted to HR (Kaleb Kassahun). Once approved, unfinished targets will move to the department holding pool."}
+                    ? "As HR Officer, review and approve or reject the following employee departure and transfer requests."
+                    : "Submitted to HR. Once approved, unworked targets will return to the holding pool and transfers will be executed."}
                 </p>
               </div>
             </div>
@@ -865,67 +893,111 @@ export default function DepartmentHoldingPoolManager({
           </div>
 
           <div className="space-y-2.5">
-            {pendingClearances.map((req: any) => (
-              <div
-                key={req.departureClearanceRequestId}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-200/80 dark:border-zinc-800 shadow-2xs"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 dark:text-zinc-100 text-sm">
-                      {req.employee?.fullName || "Employee"}
-                    </span>
-                    {req.employee?.title && (
-                      <span className="text-xs text-slate-500">({req.employee.title})</span>
-                    )}
-                    <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 text-[10px] font-semibold">
-                      Pending HR Review
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1">
-                    Last Working Day: <strong className="text-slate-800 dark:text-zinc-200">{req.effectiveDate}</strong> · Requested by:{" "}
-                    <strong className="text-slate-800 dark:text-zinc-200">{req.requestedBy?.fullName || "Manager"}</strong>
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5 italic">
-                    Reason: "{req.reason}"
-                  </p>
-                </div>
+            {pendingClearances.map((req: any) => {
+              const isTransfer =
+                req.requestType === "TRANSFER" ||
+                req.reason?.startsWith("[INTERNAL_TRANSFER:");
+              const cleanReason = (req.reason || "").replace(
+                /\[INTERNAL_TRANSFER:[^\]]+\]\s*/,
+                ""
+              );
+              const destName =
+                req.destinationDepartment?.name ||
+                allDepartments.find(
+                  (d) => d.departmentId === req.destinationDepartmentId
+                )?.name ||
+                "Destination Dept";
 
-                <div className="flex items-center gap-2">
-                  {isHrUser ? (
-                    <>
-                      <Button
-                        size="sm"
-                        disabled={approvingDeparture}
-                        onClick={() => handleApproveDeparture(req.departureClearanceRequestId, req.employee?.fullName || "Employee")}
-                        className="rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs"
-                      >
-                        <UserCheck className="h-3.5 w-3.5" />
-                        {approvingDeparture ? "Approving..." : "Approve Departure"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={rejectingDeparture}
-                        onClick={() => {
-                          setSelectedClearanceToReject(req);
-                          setRejectDialogOpen(true);
-                        }}
-                        className="rounded-lg text-xs font-semibold text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900/50 dark:hover:bg-rose-950/20"
-                      >
-                        <XCircle className="h-3.5 w-3.5 mr-1" />
-                        Reject
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-800/60 px-3 py-1.5 rounded-lg border">
-                      <Clock className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Pending HR Verification (Kaleb Kassahun)</span>
+              return (
+                <div
+                  key={req.departureClearanceRequestId}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-200/80 dark:border-zinc-800 shadow-2xs"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 dark:text-zinc-100 text-sm">
+                        {req.employee?.fullName || "Employee"}
+                      </span>
+                      {req.employee?.title && (
+                        <span className="text-xs text-slate-500">({req.employee.title})</span>
+                      )}
+                      {isTransfer ? (
+                        <Badge
+                          variant="outline"
+                          className="border-sky-400 text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 text-[10px] font-semibold"
+                        >
+                          Transfer ➔ {destName}
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-400 text-amber-700 dark:text-amber-400 text-[10px] font-semibold"
+                        >
+                          Departure Clearance
+                        </Badge>
+                      )}
                     </div>
-                  )}
+                    <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1">
+                      {isTransfer ? "Effective Date" : "Last Working Day"}:{" "}
+                      <strong className="text-slate-800 dark:text-zinc-200">
+                        {req.effectiveDate}
+                      </strong>{" "}
+                      · Requested by:{" "}
+                      <strong className="text-slate-800 dark:text-zinc-200">
+                        {req.requestedBy?.fullName || "Manager"}
+                      </strong>
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5 italic">
+                      Reason: "{cleanReason || (isTransfer ? "Department Transfer" : "Departure")}"
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {isHrUser ? (
+                      <>
+                        <Button
+                          size="sm"
+                          disabled={approvingDeparture}
+                          onClick={() =>
+                            handleApproveDeparture(
+                              req.departureClearanceRequestId,
+                              req.employee?.fullName || "Employee",
+                              isTransfer
+                            )
+                          }
+                          className="rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs"
+                        >
+                          <UserCheck className="h-3.5 w-3.5" />
+                          {approvingDeparture
+                            ? "Approving..."
+                            : isTransfer
+                            ? "Approve Transfer"
+                            : "Approve Departure"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={rejectingDeparture}
+                          onClick={() => {
+                            setSelectedClearanceToReject(req);
+                            setRejectDialogOpen(true);
+                          }}
+                          className="rounded-lg text-xs font-semibold text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900/50 dark:hover:bg-rose-950/20"
+                        >
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
+                          Reject
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-800/60 px-3 py-1.5 rounded-lg border">
+                        <Clock className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Pending HR Review</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -968,7 +1040,7 @@ export default function DepartmentHoldingPoolManager({
           }`}
         >
           <UserMinus className="h-4 w-4" />
-          Departure Clearances ({clearances.length})
+          Clearances & Transfers ({clearances.length})
           {pendingClearances.length > 0 && (
             <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white">
               {pendingClearances.length}
@@ -1081,6 +1153,14 @@ export default function DepartmentHoldingPoolManager({
                                   {formatTargetWithUnit(q.assignedActiveTarget, kpi)}
                                 </span>
                               </div>
+                              {Number(q.totalDistributed || 0) > 0 && (
+                                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                  <span>Distributed to Staff:</span>
+                                  <span className="font-semibold tabular-nums">
+                                    {formatTargetWithUnit(q.totalDistributed, kpi)}
+                                  </span>
+                                </div>
+                              )}
                               <div className="flex justify-between border-t pt-1 dark:border-zinc-700/50">
                                 <span className={`font-semibold ${
                                   isPast
@@ -1240,7 +1320,7 @@ export default function DepartmentHoldingPoolManager({
         </Card>
       )}
 
-      {/* View 3: Departure Clearances */}
+      {/* View 3: Departure Clearances & Transfers */}
       {activeTab === "CLEARANCES" && (
         <Card className="rounded-2xl border bg-white dark:bg-zinc-900 p-0 overflow-hidden shadow-2xs">
           <div className="overflow-x-auto">
@@ -1248,13 +1328,13 @@ export default function DepartmentHoldingPoolManager({
               <thead className="bg-slate-50 dark:bg-zinc-800/60 text-slate-500 dark:text-zinc-400 border-b">
                 <tr>
                   <th className="py-3 px-4 font-semibold">Date Submitted</th>
-                  <th className="py-3 px-4 font-semibold">Departing Employee</th>
-                  <th className="py-3 px-4 font-semibold">Last Working Day</th>
+                  <th className="py-3 px-4 font-semibold">Employee / Type</th>
+                  <th className="py-3 px-4 font-semibold">Effective Date</th>
                   <th className="py-3 px-4 font-semibold">Status</th>
                   <th className="py-3 px-4 font-semibold">Swept to Pool</th>
                   <th className="py-3 px-4 font-semibold">Requested By</th>
                   <th className="py-3 px-4 font-semibold">HR Reviewer</th>
-                  <th className="py-3 px-4 font-semibold">Reason / Note</th>
+                  <th className="py-3 px-4 font-semibold">Reason / Destination</th>
                   <th className="py-3 px-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
@@ -1262,106 +1342,164 @@ export default function DepartmentHoldingPoolManager({
                 {clearances.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-8 text-center text-slate-400">
-                      No departure clearance requests recorded yet.
+                      No clearance or transfer requests recorded yet.
                     </td>
                   </tr>
                 ) : (
-                  clearances.map((req: any) => (
-                    <tr
-                      key={req.departureClearanceRequestId}
-                      className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40"
-                    >
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-500">
-                        {format(new Date(req.createdAt), "MMM d, yyyy HH:mm")}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="font-semibold text-slate-900 dark:text-zinc-100">
-                          {req.employee?.fullName || "Employee"}
-                        </span>
-                        {req.employee?.title && (
-                          <span className="block text-[11px] text-slate-400">
-                            {req.employee.title}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-slate-700 dark:text-zinc-300">
-                        {req.effectiveDate}
-                      </td>
-                      <td className="py-3 px-4">
-                        {req.status === "PENDING" && (
-                          <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50/50 text-[10px] font-bold">
-                            PENDING HR REVIEW
-                          </Badge>
-                        )}
-                        {req.status === "APPROVED" && (
-                          <Badge variant="outline" className="border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 text-[10px] font-bold">
-                            APPROVED
-                          </Badge>
-                        )}
-                        {req.status === "REJECTED" && (
-                          <Badge variant="outline" className="border-rose-400 text-rose-700 dark:text-rose-400 bg-rose-50/50 text-[10px] font-bold">
-                            REJECTED
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-bold tabular-nums text-slate-900 dark:text-zinc-100">
-                        {req.sweptAmount > 0 ? formatCurrency(req.sweptAmount) : "-"}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-zinc-400">
-                        {req.requestedBy?.fullName || "Manager"}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-zinc-400">
-                        {req.reviewedBy?.fullName ? (
-                          <span>{req.reviewedBy.fullName}</span>
-                        ) : (
-                          <span className="text-slate-400 italic">Awaiting HR</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-slate-500 max-w-xs truncate" title={req.status === "REJECTED" ? req.rejectionReason : req.reason}>
-                        {req.status === "REJECTED" ? (
-                          <span className="text-rose-600">Rejection: {req.rejectionReason}</span>
-                        ) : (
-                          req.reason
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        {req.status === "PENDING" && isHrUser ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              size="sm"
-                              disabled={approvingDeparture}
-                              onClick={() => handleApproveDeparture(req.departureClearanceRequestId, req.employee?.fullName || "Employee")}
-                              className="h-7 px-2.5 rounded-lg text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={rejectingDeparture}
-                              onClick={() => {
-                                setSelectedClearanceToReject(req);
-                                setRejectDialogOpen(true);
-                              }}
-                              className="h-7 px-2 rounded-lg text-[11px] font-semibold text-rose-600 border-rose-200 hover:bg-rose-50"
-                            >
-                              Reject
-                            </Button>
+                  clearances.map((req: any) => {
+                    const isTransfer =
+                      req.requestType === "TRANSFER" ||
+                      req.reason?.startsWith("[INTERNAL_TRANSFER:");
+                    const cleanReason = (req.reason || "").replace(
+                      /\[INTERNAL_TRANSFER:[^\]]+\]\s*/,
+                      ""
+                    );
+                    const destName =
+                      req.destinationDepartment?.name ||
+                      allDepartments.find(
+                        (d) => d.departmentId === req.destinationDepartmentId
+                      )?.name ||
+                      "Destination Dept";
+
+                    return (
+                      <tr
+                        key={req.departureClearanceRequestId}
+                        className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40"
+                      >
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-500">
+                          {format(new Date(req.createdAt), "MMM d, yyyy HH:mm")}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-slate-900 dark:text-zinc-100">
+                              {req.employee?.fullName || "Employee"}
+                            </span>
+                            {isTransfer ? (
+                              <Badge
+                                variant="outline"
+                                className="border-sky-300 bg-sky-50 text-[10px] font-bold text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
+                              >
+                                Transfer ➔ {destName}
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="border-rose-300 bg-rose-50 text-[10px] font-bold text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                              >
+                                Departure
+                              </Badge>
+                            )}
                           </div>
-                        ) : req.status === "PENDING" ? (
-                          <span className="text-[11px] text-slate-400 italic">Pending Review</span>
-                        ) : req.status === "APPROVED" ? (
-                          <span className="text-[11px] text-emerald-600 font-semibold flex items-center justify-end gap-1">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Swept
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-rose-600 font-semibold flex items-center justify-end gap-1">
-                            <XCircle className="h-3.5 w-3.5" /> Closed
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                          {req.employee?.title && (
+                            <span className="block text-[11px] text-slate-400">
+                              {req.employee.title}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-slate-700 dark:text-zinc-300">
+                          {req.effectiveDate}
+                        </td>
+                        <td className="py-3 px-4">
+                          {req.status === "PENDING" && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50/50 text-[10px] font-bold"
+                            >
+                              PENDING HR REVIEW
+                            </Badge>
+                          )}
+                          {req.status === "APPROVED" && (
+                            <Badge
+                              variant="outline"
+                              className="border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 text-[10px] font-bold"
+                            >
+                              APPROVED
+                            </Badge>
+                          )}
+                          {req.status === "REJECTED" && (
+                            <Badge
+                              variant="outline"
+                              className="border-rose-400 text-rose-700 dark:text-rose-400 bg-rose-50/50 text-[10px] font-bold"
+                            >
+                              REJECTED
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 font-bold tabular-nums text-slate-900 dark:text-zinc-100">
+                          {req.sweptAmount > 0 ? formatCurrency(req.sweptAmount) : "-"}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 dark:text-zinc-400">
+                          {req.requestedBy?.fullName || "Manager"}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 dark:text-zinc-400">
+                          {req.reviewedBy?.fullName ? (
+                            <span>{req.reviewedBy.fullName}</span>
+                          ) : (
+                            <span className="text-slate-400 italic">Awaiting HR</span>
+                          )}
+                        </td>
+                        <td
+                          className="py-3 px-4 text-slate-500 max-w-xs truncate"
+                          title={req.status === "REJECTED" ? req.rejectionReason : cleanReason}
+                        >
+                          {req.status === "REJECTED" ? (
+                            <span className="text-rose-600">Rejection: {req.rejectionReason}</span>
+                          ) : isTransfer ? (
+                            <span>
+                              <span className="font-semibold text-sky-700 dark:text-sky-400">
+                                To {destName}:{" "}
+                              </span>
+                              {cleanReason || "Internal transfer"}
+                            </span>
+                          ) : (
+                            cleanReason || "Departure clearance"
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {req.status === "PENDING" && isHrUser ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                disabled={approvingDeparture}
+                                onClick={() =>
+                                  handleApproveDeparture(
+                                    req.departureClearanceRequestId,
+                                    req.employee?.fullName || "Employee",
+                                    isTransfer
+                                  )
+                                }
+                                className="h-7 px-2.5 rounded-lg text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={rejectingDeparture}
+                                onClick={() => {
+                                  setSelectedClearanceToReject(req);
+                                  setRejectDialogOpen(true);
+                                }}
+                                className="h-7 px-2 rounded-lg text-[11px] font-semibold text-rose-600 border-rose-200 hover:bg-rose-50"
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          ) : req.status === "PENDING" ? (
+                            <span className="text-[11px] text-slate-400 italic">Pending Review</span>
+                          ) : req.status === "APPROVED" ? (
+                            <span className="text-[11px] text-emerald-600 font-semibold flex items-center justify-end gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> {isTransfer ? "Transferred" : "Swept"}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-rose-600 font-semibold flex items-center justify-end gap-1">
+                              <XCircle className="h-3.5 w-3.5" /> Closed
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1440,10 +1578,19 @@ export default function DepartmentHoldingPoolManager({
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reject Departure Clearance</DialogTitle>
+            <DialogTitle>
+              {selectedClearanceToReject?.requestType === "TRANSFER" ||
+              selectedClearanceToReject?.reason?.startsWith("[INTERNAL_TRANSFER:")
+                ? "Reject Transfer Request"
+                : "Reject Departure Clearance"}
+            </DialogTitle>
             <DialogDescription>
-              Please enter the reason for rejecting the departure clearance for{" "}
-              <strong>{selectedClearanceToReject?.employee?.fullName}</strong>.
+              Please enter the reason for rejecting the{" "}
+              {selectedClearanceToReject?.requestType === "TRANSFER" ||
+              selectedClearanceToReject?.reason?.startsWith("[INTERNAL_TRANSFER:")
+                ? "transfer request"
+                : "departure clearance"}{" "}
+              for <strong>{selectedClearanceToReject?.employee?.fullName}</strong>.
             </DialogDescription>
           </DialogHeader>
 
@@ -1687,9 +1834,9 @@ export default function DepartmentHoldingPoolManager({
       <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Transfer Employee</DialogTitle>
+            <DialogTitle>Request Employee Transfer</DialogTitle>
             <DialogDescription>
-              Move an employee to another department. Their finished work stays with this department, unfinished targets stay in this pool, and they start fresh in the new department.
+              Request an employee transfer to another department. This request will be routed to HR for formal review and approval. Upon HR approval, unworked targets remain in this pool and the employee will be transitioned to the destination department.
             </DialogDescription>
           </DialogHeader>
 
@@ -1701,7 +1848,7 @@ export default function DepartmentHoldingPoolManager({
                   <SelectValue placeholder="Choose an employee..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeEmployees.map((emp) => (
+                  {departureEligibleEmployees.map((emp) => (
                     <SelectItem key={emp.employeeId} value={emp.employeeId}>
                       {emp.fullName} {emp.title ? `(${emp.title})` : ""}
                     </SelectItem>
@@ -1747,6 +1894,10 @@ export default function DepartmentHoldingPoolManager({
                 onChange={(e) => setTransferReason(e.target.value)}
               />
             </div>
+
+            <div className="rounded-xl p-3 bg-sky-50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-900/40 text-xs text-sky-800 dark:text-sky-300">
+              <strong>HR Approval Workflow:</strong> Submitting this sends an in-app approval notification to HR. Upon approval, unworked targets stay in this department's pool, and the employee is moved to the destination department.
+            </div>
           </div>
 
           <DialogFooter>
@@ -1755,123 +1906,72 @@ export default function DepartmentHoldingPoolManager({
             </Button>
             <Button
               onClick={handleInternalTransfer}
-              disabled={transferring}
+              disabled={requestingDeparture}
               className="bg-sky-600 hover:bg-sky-700 text-white"
             >
-              {transferring ? "Transferring..." : "Transfer Employee"}
+              {requestingDeparture ? "Submitting..." : "Submit Transfer for HR Approval"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Modal 4: Change Role / Promotion */}
-      <Dialog open={transitionOpen} onOpenChange={setTransitionOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Change Role or Promotion</DialogTitle>
-            <DialogDescription>
-              When an employee gets promoted or changes roles, their unfinished targets on old KPIs move to the department pool, and you can give them new targets for their new role.
-            </DialogDescription>
-          </DialogHeader>
+      {selectedEmpForTransition ? (
+        <PromoteEmployeeDialog
+          employee={selectedEmpForTransition as any}
+          open={transitionOpen}
+          onOpenChange={(val) => {
+            setTransitionOpen(val);
+            if (!val) setTransitionEmpId("");
+          }}
+          onSuccess={() => {
+            refetchPool();
+            refetchLedger();
+            onEmployeeTransferred?.();
+          }}
+        />
+      ) : (
+        <Dialog open={transitionOpen} onOpenChange={setTransitionOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Select Employee to Promote</DialogTitle>
+              <DialogDescription>
+                Choose a team member in {departmentName} to promote or transition to a new role.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>Who is changing roles?</Label>
-              <Select value={transitionEmpId} onValueChange={setTransitionEmpId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Choose an employee..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeEmployees.map((emp) => (
-                    <SelectItem key={emp.employeeId} value={emp.employeeId}>
-                      {emp.fullName} {emp.title ? `(${emp.title})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-4 py-2">
               <div>
-                <Label>Change Type</Label>
-                <Select
-                  value={transitionType}
-                  onValueChange={(val: "PROMOTION" | "DEMOTION") => setTransitionType(val)}
-                >
+                <Label>Who is being promoted?</Label>
+                <Select value={transitionEmpId} onValueChange={setTransitionEmpId}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue />
+                    <SelectValue placeholder="Choose an employee..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PROMOTION">Promotion</SelectItem>
-                    <SelectItem value="DEMOTION">Role Change</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Starts in Quarter</Label>
-                <Select
-                  value={String(effectiveQuarter)}
-                  onValueChange={(val) => setEffectiveQuarter(Number(val))}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Quarter 1</SelectItem>
-                    <SelectItem value="2">Quarter 2</SelectItem>
-                    <SelectItem value="3">Quarter 3</SelectItem>
-                    <SelectItem value="4">Quarter 4</SelectItem>
+                    {activeEmployees.map((emp) => (
+                      <SelectItem key={emp.employeeId} value={emp.employeeId}>
+                        {emp.fullName} {emp.title ? `(${emp.title})` : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div>
-              <Label>New Job Title</Label>
-              <Input
-                className="mt-1"
-                placeholder="e.g. Senior Tech Lead, Team Lead..."
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label>New Target Amount</Label>
-              <Input
-                type="number"
-                className="mt-1"
-                value={newKpiTarget}
-                onChange={(e) => setNewKpiTarget(parseFloat(e.target.value) || 0)}
-              />
-            </div>
-
-            <div>
-              <Label>Reason</Label>
-              <Input
-                className="mt-1"
-                placeholder="e.g. Promoted to Senior Lead based on annual review..."
-                value={transitionReason}
-                onChange={(e) => setTransitionReason(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTransitionOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleRoleTransition}
-              disabled={transitioning}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              {transitioning ? "Saving..." : "Save Role Change"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTransitionOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!transitionEmpId}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                Continue to Promotion Setup
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import SyncButton from "@/components/shared/SyncButton";
 import { PlusIcon, SearchIcon, FilterIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { FrontendLogbookItem } from "@/types/logbook";
 
 // Helper function to map backend entry to frontend format
@@ -67,6 +68,7 @@ function PersonalLogbookPage() {
   // Get current user
   const { data: userData } = useQuery(GET_ME);
   const currentUser = userData?.me;
+  const isOffboarded = currentUser?.status === "DISABLED";
 
   // Get logbook entries
   const { data, loading, refetch } = useQuery(GET_LOGBOOK_ENTRIES, {
@@ -145,6 +147,12 @@ function PersonalLogbookPage() {
 
   return (
     <div className="h-full flex flex-col">
+      {isOffboarded && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 shadow-2xs dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+          <strong>Account Offboarded:</strong> Your past fulfilled tasks and approved evidence remain safely preserved for your historical record. New logbook submissions and edits are closed.
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -159,11 +167,14 @@ function PersonalLogbookPage() {
           <SyncButton onSync={handleSyncLogbook} label="Sync" />
           <Button
             type="button"
+            disabled={isOffboarded}
+            title={isOffboarded ? "Logbook entries are closed for offboarded accounts." : undefined}
             onClick={() => {
+              if (isOffboarded) return;
               setEditingEntry(null);
               setIsAddEntryOpen(true);
             }}
-            className="gap-2"
+            className={cn("gap-2", isOffboarded && "opacity-50 cursor-not-allowed")}
           >
             <PlusIcon className="h-4 w-4" />
             Add entry

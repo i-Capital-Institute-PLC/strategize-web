@@ -21,6 +21,10 @@ export const GET_ME = gql`
       startDate
       isFirstLogin
       mustChangePassword
+      departments {
+        departmentId
+        name
+      }
       createdAt
       updatedAt
     }

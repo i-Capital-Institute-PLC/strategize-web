@@ -13,6 +13,7 @@ import { SubmitApprovalDialog } from "./SubmitApprovalDialog";
 import { format } from "date-fns";
 import type { FrontendLogbookItem } from "@/types/logbook";
 import { AttachmentList } from "@/components/files/AttachmentTrigger";
+import { useAuthStore } from "@/stores";
 
 interface LogbookTableCardProps {
   item: FrontendLogbookItem;
@@ -37,15 +38,19 @@ export function LogbookTableCard({
     }
   };
 
+  const user = useAuthStore((state) => state.user);
+  const isOffboarded = user?.status === "DISABLED";
   const normalizedStatus = String(item.status || "DRAFT").toUpperCase();
   const isRejected = normalizedStatus === "REJECTED";
   const evidencePending = item.evidenceApprovalStatus === "PENDING";
   const canSubmit =
+    !isOffboarded &&
     !evidencePending &&
     (["DRAFT", "REJECTED"].includes(normalizedStatus) || !item.status);
   const isLocked =
     evidencePending || ["SUBMITTED", "APPROVED"].includes(normalizedStatus);
   const canEdit =
+    !isOffboarded &&
     !isLocked &&
     (["DRAFT", "REJECTED"].includes(normalizedStatus) || !item.status);
 

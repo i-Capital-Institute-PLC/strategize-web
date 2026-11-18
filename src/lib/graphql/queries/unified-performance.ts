@@ -102,6 +102,7 @@ export const GET_TEAM_PERFORMANCE = gql`
           fullName
           email
           title
+          status
           picture
           departments {
             departmentId
@@ -165,6 +166,7 @@ export const GET_TEAM_PERFORMANCE = gql`
           fullName
           email
           title
+          status
           picture
         }
         totalScore

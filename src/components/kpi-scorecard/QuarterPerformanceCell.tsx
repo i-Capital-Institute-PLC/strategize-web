@@ -197,8 +197,8 @@ export function QuarterPerformanceCell({
               </div>
 
               {isZeroTarget ? (
-                <div className="text-slate-400 py-1">
-                  There is no planned target this quarter (0.00 quota).
+                <div className="text-amber-700 dark:text-amber-300 py-1 font-medium text-[11px]">
+                  Target swept or rebalanced to department holding pool (0.00 active quota). Historical achievements in earlier quarters remain fully credited.
                 </div>
               ) : (
                 <>
@@ -353,8 +353,8 @@ export function QuarterPerformanceCell({
 
                   {/* Compact: Target vs Actual */}
                   {isZeroTarget ? (
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500 italic mt-0.5 leading-tight">
-                      No planned target this quarter
+                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400 font-medium italic mt-0.5 leading-tight">
+                      Rebalanced to Pool
                     </div>
                   ) : isOpenQuarter ? (
                     <div className="text-muted-foreground text-[10px] mt-0.5">

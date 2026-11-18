@@ -101,6 +101,7 @@ const GET_TEAM_PERFORMANCE = gql`
           fullName
           email
           title
+          status
         }
         strategicPeriodId
         totalScore
@@ -243,6 +244,7 @@ export default function UnifiedPerformanceReport({
       filters: {
         strategicPeriodId: selectedPeriodId,
         organizationId: user?.organizationId,
+        includeInactive: true,
         // Note: divisionId and departmentId filtering would need to be added based on user's department membership
       },
     },
@@ -678,8 +680,15 @@ export default function UnifiedPerformanceReport({
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Top {rankingMode === "kpi" ? "Individual KPI Performer" : "Live Composite Performer"}</div>
-                  <div className="text-base font-bold text-slate-900 dark:text-zinc-100">
-                    {topRankedResult.employee.fullName}
+                  <div className="flex items-center gap-2">
+                    <div className="text-base font-bold text-slate-900 dark:text-zinc-100">
+                      {topRankedResult.employee.fullName}
+                    </div>
+                    {topRankedResult.employee?.status && topRankedResult.employee.status !== "ACTIVE" && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                        Departed
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs font-semibold text-amber-600 dark:text-amber-400">
                     {rankingScore(topRankedResult).toFixed(1)}% {rankingLabel.toLowerCase()}
@@ -755,9 +764,16 @@ export default function UnifiedPerformanceReport({
                         #{index + 1}
                       </div>
                       <div>
-                        <h5 className="font-bold text-slate-900 dark:text-zinc-100">
-                          {result.employee.fullName}
-                        </h5>
+                        <div className="flex items-center gap-2">
+                          <h5 className="font-bold text-slate-900 dark:text-zinc-100">
+                            {result.employee.fullName}
+                          </h5>
+                          {result.employee?.status && result.employee.status !== "ACTIVE" && (
+                            <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                              Departed
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500 dark:text-zinc-400">
                           {result.employee.title}
                         </p>
@@ -846,8 +862,15 @@ export default function UnifiedPerformanceReport({
                   className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-slate-50/40 p-4 dark:border-zinc-800 dark:bg-zinc-800/20"
                 >
                   <div>
-                    <div className="font-bold text-slate-900 dark:text-zinc-100">
-                      {result.employee.fullName}
+                    <div className="flex items-center gap-2">
+                      <div className="font-bold text-slate-900 dark:text-zinc-100">
+                        {result.employee.fullName}
+                      </div>
+                      {result.employee?.status && result.employee.status !== "ACTIVE" && (
+                        <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                          Departed
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-zinc-400">
                       {result.employee.title} · {result.breakdown.kpiScore.scope.toLowerCase()} scorecard

@@ -182,7 +182,8 @@ export default function NotificationDropdown() {
 
     const isDepartureClearance =
       n.relatedEntityType === "DepartureClearanceRequest" ||
-      (n.title || "").toLowerCase().includes("departure clearance");
+      (n.title || "").toLowerCase().includes("departure clearance") ||
+      (n.title || "").toLowerCase().includes("transfer request");
 
     if (isDepartureClearance) {
       return isHrOrAdmin;
@@ -386,7 +387,8 @@ export default function NotificationDropdown() {
     // Check if this is a Departure Clearance Request
     const isDepartureClearance =
       notification.relatedEntityType === "DepartureClearanceRequest" ||
-      (notification.title || "").toLowerCase().includes("departure clearance");
+      (notification.title || "").toLowerCase().includes("departure clearance") ||
+      (notification.title || "").toLowerCase().includes("transfer request");
 
     if (isDepartureClearance && notification.relatedEntityId) {
       try {

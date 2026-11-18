@@ -35,9 +35,13 @@ export default function Topbar() {
   const open = useUIStore((state) => state.sidebarOpen);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const pathname = usePathname();
-  const userPicture = useAuthStore((state) => state.user?.picture);
-  const userFullName = useAuthStore((state) => state.user?.fullName);
-  const userEmail = useAuthStore((state) => state.user?.email);
+  const user = useAuthStore((state) => state.user);
+  const userPicture = user?.picture;
+  const userFullName = user?.fullName;
+  const userEmail = user?.email;
+  const userStatus = user?.status;
+  const userDepartmentName = user?.departments?.[0]?.name;
+  const isOffboarded = userStatus === "DISABLED";
   const { logout } = useAuthContext();
   const router = useRouter();
 
@@ -136,6 +140,19 @@ export default function Topbar() {
             </DropdownMenu>
           </div>
 
+          {isOffboarded && (
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs dark:bg-amber-950/70 dark:text-amber-200 dark:border-amber-700/60">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              Offboarded
+            </span>
+          )}
+
+          {!isOffboarded && userDepartmentName && (
+            <span className="hidden lg:inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs dark:bg-zinc-800/90 dark:text-zinc-200 dark:border-zinc-700">
+              {userDepartmentName}
+            </span>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -166,9 +183,19 @@ export default function Topbar() {
                     <span className="truncate font-medium">
                       {userFullName || "User"}
                     </span>
-                    <span className="truncate text-sm text-gray-500 dark:text-gray-400">
+                    <span className="truncate text-xs text-gray-500 dark:text-gray-400">
                       {userEmail || ""}
                     </span>
+                    {userDepartmentName && (
+                      <span className="truncate text-[11px] font-medium text-indigo-600 dark:text-indigo-400 mt-0.5">
+                        {userDepartmentName}
+                      </span>
+                    )}
+                    {isOffboarded && (
+                      <span className="inline-block mt-1 w-fit rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                        Offboarded
+                      </span>
+                    )}
                   </div>
                 </div>
               </DropdownMenuItem>
