@@ -103,6 +103,19 @@ export default function DepartmentHoldingPoolManager({
   const [totalQuarterDays, setTotalQuarterDays] = useState(90);
   const [distributeReason, setDistributeReason] = useState("");
 
+  // Derived proration calculations
+  const safeTotalQuarterDays = totalQuarterDays > 0 ? totalQuarterDays : 90;
+  const safeProrationDays = Math.max(0, Math.min(prorationDays, safeTotalQuarterDays));
+  const prorationRatio = safeTotalQuarterDays > 0 ? safeProrationDays / safeTotalQuarterDays : 1;
+  const effectiveDelta = useMemo(() => {
+    if (!prorationEnabled) return quotaDelta;
+    return Number((quotaDelta * prorationRatio).toFixed(2));
+  }, [prorationEnabled, quotaDelta, prorationRatio]);
+  const prorationDifference = useMemo(() => {
+    if (!prorationEnabled) return 0;
+    return Number((quotaDelta - effectiveDelta).toFixed(2));
+  }, [prorationEnabled, quotaDelta, effectiveDelta]);
+
   // Transfer Form State
   const [transferEmpId, setTransferEmpId] = useState("");
   const [toDepartmentId, setToDepartmentId] = useState("");
@@ -477,7 +490,8 @@ export default function DepartmentHoldingPoolManager({
 
   // Handle Distribution
   const handleDistributeQuota = async () => {
-    if (!recipientEmpId || quotaDelta <= 0 || !distributeReason) {
+    const finalAmountToAssign = prorationEnabled ? effectiveDelta : quotaDelta;
+    if (!recipientEmpId || finalAmountToAssign <= 0 || !distributeReason) {
       toast.error("Please select an employee, enter target amount, and write a reason.");
       return;
     }
@@ -511,9 +525,9 @@ export default function DepartmentHoldingPoolManager({
             allocations: [
               {
                 employeeId: recipientEmpId,
-                targetDelta: quotaDelta,
-                prorationDays: prorationEnabled ? prorationDays : null,
-                totalQuarterDays: prorationEnabled ? totalQuarterDays : null,
+                targetDelta: finalAmountToAssign,
+                prorationDays: prorationEnabled ? safeProrationDays : null,
+                totalQuarterDays: prorationEnabled ? safeTotalQuarterDays : null,
               },
             ],
             reason: distributeReason,
@@ -1564,25 +1578,61 @@ export default function DepartmentHoldingPoolManager({
               </div>
 
               {prorationEnabled && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <div>
-                    <Label className="text-[11px]">Days left to work</Label>
-                    <Input
-                      type="number"
-                      className="mt-1"
-                      value={prorationDays}
-                      onChange={(e) => setProrationDays(parseInt(e.target.value) || 0)}
-                    />
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-[11px]">Days left to work</Label>
+                      <Input
+                        type="number"
+                        className="mt-1"
+                        min={0}
+                        max={safeTotalQuarterDays}
+                        value={prorationDays}
+                        onChange={(e) => setProrationDays(parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[11px]">Total days in quarter</Label>
+                      <Input
+                        type="number"
+                        className="mt-1"
+                        min={1}
+                        value={totalQuarterDays}
+                        onChange={(e) => setTotalQuarterDays(parseInt(e.target.value) || 90)}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-[11px]">Total days in quarter</Label>
-                    <Input
-                      type="number"
-                      className="mt-1"
-                      value={totalQuarterDays}
-                      onChange={(e) => setTotalQuarterDays(parseInt(e.target.value) || 90)}
-                    />
-                  </div>
+
+                  {quotaDelta > 0 && (
+                    <div className="rounded-lg bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 p-3 space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center text-slate-600 dark:text-zinc-400">
+                        <span>Entered Base Target:</span>
+                        <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                          {formatTargetWithUnit(quotaDelta, selectedKpiForDist)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-600 dark:text-zinc-400">
+                        <span>Proration Factor:</span>
+                        <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                          {safeProrationDays} / {safeTotalQuarterDays} days ({(prorationRatio * 100).toFixed(1)}%)
+                        </span>
+                      </div>
+                      <div className="border-t border-emerald-200 dark:border-emerald-800/60 pt-1.5 flex justify-between items-center">
+                        <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                          Prorated Target to Employee:
+                        </span>
+                        <span className="font-extrabold text-sm text-emerald-700 dark:text-emerald-400">
+                          {formatTargetWithUnit(effectiveDelta, selectedKpiForDist)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-zinc-400 pt-0.5">
+                        <span>Difference (Stays in Pool as Vacancy Gap):</span>
+                        <span className="font-semibold text-slate-700 dark:text-zinc-300">
+                          {formatTargetWithUnit(prorationDifference, selectedKpiForDist)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1608,6 +1658,7 @@ export default function DepartmentHoldingPoolManager({
                 distributing ||
                 !recipientEmpId ||
                 quotaDelta <= 0 ||
+                effectiveDelta <= 0 ||
                 ((!selectedKpiForDist || !isPercent(selectedKpiForDist)) &&
                   quotaDelta > (selectedKpiForDist?.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? 0)) ||
                 (Boolean(selectedKpiForDist && isPercent(selectedKpiForDist)) && quotaDelta > 100)
@@ -1621,7 +1672,7 @@ export default function DepartmentHoldingPoolManager({
                 ? "Amount Exceeds Pool"
                 : selectedKpiForDist && isPercent(selectedKpiForDist) && quotaDelta > 100
                 ? "Exceeds 100%"
-                : `Assign ${selectedKpiForDist ? formatTargetWithUnit(quotaDelta, selectedKpiForDist) : "Targets"}`}
+                : `Assign ${selectedKpiForDist ? formatTargetWithUnit(effectiveDelta, selectedKpiForDist) : "Targets"}${prorationEnabled ? " (Prorated)" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>
