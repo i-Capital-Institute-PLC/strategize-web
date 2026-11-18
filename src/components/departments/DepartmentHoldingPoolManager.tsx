@@ -267,6 +267,49 @@ export default function DepartmentHoldingPoolManager({
     })}`;
   };
 
+  // Helper to get clean human-readable unit label for any KPI
+  const getKpiUnitLabel = (kpi: any): string => {
+    if (!kpi) return "Units";
+    if (isCurrency(kpi)) return "ETB";
+    if (isPercent(kpi)) return "%";
+
+    const unit = (kpi.measurementUnit || "").trim();
+    const unitLower = unit.toLowerCase();
+    if (
+      !unit ||
+      unitLower === "number" ||
+      unitLower === "count" ||
+      unitLower === "numeric" ||
+      unitLower === "unit" ||
+      unitLower === "units"
+    ) {
+      return "Units";
+    }
+    return unit;
+  };
+
+  // Helper to format a target amount with its appropriate unit
+  const formatTargetWithUnit = (val: number, kpi: any): string => {
+    const formattedNum = formatNumber(val);
+    if (!kpi) return `${formattedNum} Units`;
+
+    if (isCurrency(kpi)) {
+      return `ETB ${formattedNum}`;
+    }
+    if (isPercent(kpi)) {
+      return `${formattedNum}%`;
+    }
+
+    const unitLabel = getKpiUnitLabel(kpi);
+    return `${formattedNum} ${unitLabel}`;
+  };
+
+  // Helper to get the button text for assigning from holding pool
+  const getAssignButtonText = (poolBalance: number, kpi: any): string => {
+    const formatted = formatTargetWithUnit(poolBalance, kpi);
+    return `Assign ${formatted}`;
+  };
+
   // Summary Metrics: Strictly separates financial quotas (ETB) from quality & percentage standards (%)
   const summary = useMemo(() => {
     let financialBalance = 0;
@@ -925,9 +968,9 @@ export default function DepartmentHoldingPoolManager({
                       <p className="text-xs text-slate-500 dark:text-zinc-400">
                         Annual Department Goal:{" "}
                         <span className="font-semibold text-slate-700 dark:text-zinc-300">
-                          {kpiIsCurrency ? formatCurrency(kpi.annualDepartmentTarget) : `${formatNumber(kpi.annualDepartmentTarget)} ${kpi.measurementUnit}`}
+                          {formatTargetWithUnit(kpi.annualDepartmentTarget, kpi)}
                         </span>{" "}
-                        · Type: {kpi.unitType}
+                        · Type: {kpiIsCurrency ? "Financial (ETB)" : isPercent(kpi) ? "Performance Standard (%)" : `Quantity (${getKpiUnitLabel(kpi)})`}
                       </p>
                     </div>
                   </div>
@@ -991,13 +1034,13 @@ export default function DepartmentHoldingPoolManager({
                               <div className="flex justify-between">
                                 <span className="text-slate-500">Department Goal:</span>
                                 <span className="font-semibold tabular-nums">
-                                  {formatVal(q.departmentTarget)} {kpiIsCurrency ? "ETB" : kpi.measurementUnit}
+                                  {formatTargetWithUnit(q.departmentTarget, kpi)}
                                 </span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-slate-500">Assigned to Team:</span>
                                 <span className="font-semibold tabular-nums">
-                                  {formatVal(q.assignedActiveTarget)} {kpiIsCurrency ? "ETB" : kpi.measurementUnit}
+                                  {formatTargetWithUnit(q.assignedActiveTarget, kpi)}
                                 </span>
                               </div>
                               <div className="flex justify-between border-t pt-1 dark:border-zinc-700/50">
@@ -1017,7 +1060,7 @@ export default function DepartmentHoldingPoolManager({
                                     ? "text-emerald-700 dark:text-emerald-400"
                                     : "text-slate-700 dark:text-zinc-300"
                                 }`}>
-                                  {formatVal(q.poolBalance)} {kpiIsCurrency ? "ETB" : kpi.measurementUnit}
+                                  {formatTargetWithUnit(q.poolBalance, kpi)}
                                 </span>
                               </div>
                             </div>
@@ -1054,10 +1097,11 @@ export default function DepartmentHoldingPoolManager({
                                     setQuotaDelta(q.poolBalance);
                                     setDistributeOpen(true);
                                   }}
-                                  className="w-full rounded-lg text-xs font-semibold gap-1 text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs"
+                                  className="w-full rounded-lg text-xs font-semibold gap-1.5 text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs px-2"
+                                  title={getAssignButtonText(q.poolBalance, kpi)}
                                 >
-                                  <UserPlus className="h-3.5 w-3.5" />
-                                  Assign {formatVal(q.poolBalance)} Targets
+                                  <UserPlus className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{getAssignButtonText(q.poolBalance, kpi)}</span>
                                 </Button>
                               ) : (
                                 <div className="text-center py-1.5 text-[11px] text-slate-400 font-medium">
@@ -1436,18 +1480,30 @@ export default function DepartmentHoldingPoolManager({
             </div>
 
             <div>
-              <Label>
-                How many targets to give?{" "}
-                <span className="text-slate-400 font-normal">
-                  ({selectedKpiForDist && isCurrency(selectedKpiForDist) ? "ETB" : selectedKpiForDist?.measurementUnit || "units"})
+              <div className="flex items-center justify-between mb-1">
+                <Label>
+                  Target amount to assign{" "}
+                  <span className="text-slate-400 font-normal">
+                    ({selectedKpiForDist ? getKpiUnitLabel(selectedKpiForDist) : "Units"})
+                  </span>
+                </Label>
+                {selectedKpiForDist && (
+                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    Available: {formatTargetWithUnit(selectedKpiForDist.quarters?.find((q: any) => q.quarterNumber === selectedQuarterForDist)?.poolBalance ?? quotaDelta, selectedKpiForDist)}
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <Input
+                  type="number"
+                  className="pr-16"
+                  value={quotaDelta}
+                  onChange={(e) => setQuotaDelta(parseFloat(e.target.value) || 0)}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">
+                  {selectedKpiForDist ? getKpiUnitLabel(selectedKpiForDist) : "Units"}
                 </span>
-              </Label>
-              <Input
-                type="number"
-                className="mt-1"
-                value={quotaDelta}
-                onChange={(e) => setQuotaDelta(parseFloat(e.target.value) || 0)}
-              />
+              </div>
             </div>
 
             {/* Proration Toggle */}
@@ -1509,9 +1565,9 @@ export default function DepartmentHoldingPoolManager({
             <Button
               onClick={handleDistributeQuota}
               disabled={distributing}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
-              {distributing ? "Assigning..." : "Assign Targets"}
+              {distributing ? "Assigning..." : `Assign ${selectedKpiForDist ? formatTargetWithUnit(quotaDelta, selectedKpiForDist) : "Targets"}`}
             </Button>
           </DialogFooter>
         </DialogContent>
