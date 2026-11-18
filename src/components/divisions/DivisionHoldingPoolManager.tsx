@@ -54,12 +54,14 @@ interface DivisionHoldingPoolManagerProps {
   divisionId: string;
   divisionName: string;
   departments: DepartmentItem[];
+  readOnly?: boolean;
 }
 
 export default function DivisionHoldingPoolManager({
   divisionId,
   divisionName,
   departments,
+  readOnly = false,
 }: DivisionHoldingPoolManagerProps) {
   const selectedPeriod = useStrategicPeriodStore((state) => state.selectedPeriod);
   const annualStrategicPeriodId = selectedPeriod?.strategicPeriodId;
@@ -276,47 +278,51 @@ export default function DivisionHoldingPoolManager({
             Refresh
           </Button>
 
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => {
-              resetForms();
-              if (poolKpis.length > 0) setSelectedKpiId(poolKpis[0].kpiId);
-              setReserveOpen(true);
-            }}
-            className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Save Backup Targets
-          </Button>
+          {!readOnly && (
+            <>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => {
+                  resetForms();
+                  if (poolKpis.length > 0) setSelectedKpiId(poolKpis[0].kpiId);
+                  setReserveOpen(true);
+                }}
+                className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Save Backup Targets
+              </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              resetForms();
-              if (poolKpis.length > 0) setSelectedKpiId(poolKpis[0].kpiId);
-              setSurrenderOpen(true);
-            }}
-            className="gap-1.5 text-xs text-amber-700 border-amber-300 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-          >
-            <ArrowDownLeft className="w-3.5 h-3.5" />
-            Pull Targets from Department
-          </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  resetForms();
+                  if (poolKpis.length > 0) setSelectedKpiId(poolKpis[0].kpiId);
+                  setSurrenderOpen(true);
+                }}
+                className="gap-1.5 text-xs text-amber-700 border-amber-300 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+              >
+                <ArrowDownLeft className="w-3.5 h-3.5" />
+                Pull Targets from Department
+              </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              resetForms();
-              if (poolKpis.length > 0) setSelectedKpiId(poolKpis[0].kpiId);
-              setReallocateOpen(true);
-            }}
-            className="gap-1.5 text-xs text-emerald-700 border-emerald-300 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
-          >
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            Give Targets to Department
-          </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  resetForms();
+                  if (poolKpis.length > 0) setSelectedKpiId(poolKpis[0].kpiId);
+                  setReallocateOpen(true);
+                }}
+                className="gap-1.5 text-xs text-emerald-700 border-emerald-300 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                Give Targets to Department
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -459,7 +465,7 @@ export default function DivisionHoldingPoolManager({
                             Quarter Closed
                           </Button>
                         ) : isCurrent ? (
-                          hasReserve ? (
+                          hasReserve && !readOnly ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -475,6 +481,10 @@ export default function DivisionHoldingPoolManager({
                               <ArrowUpRight className="w-3 h-3" />
                               Give {q.poolBalance} to Dept
                             </Button>
+                          ) : hasReserve ? (
+                            <div className="text-center py-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                              Reserved: {q.poolBalance}
+                            </div>
                           ) : (
                             <div className="text-center py-1.5 text-[11px] text-muted-foreground font-medium">
                               ✓ Fully Assigned

@@ -60,6 +60,7 @@ interface DepartmentHoldingPoolManagerProps {
   departmentName: string;
   employees: Array<{ employeeId: string; fullName: string; title?: string; status?: string }>;
   allDepartments?: Array<{ departmentId: string; name: string }>;
+  onEmployeeTransferred?: () => void;
 }
 
 export default function DepartmentHoldingPoolManager({
@@ -67,6 +68,7 @@ export default function DepartmentHoldingPoolManager({
   departmentName,
   employees,
   allDepartments = [],
+  onEmployeeTransferred,
 }: DepartmentHoldingPoolManagerProps) {
   const selectedPeriod = useStrategicPeriodStore((state) => state.selectedPeriod);
   const annualStrategicPeriodId = selectedPeriod?.strategicPeriodId;
@@ -542,6 +544,7 @@ export default function DepartmentHoldingPoolManager({
         setDistributeReason("");
         refetchPool();
         refetchLedger();
+        onEmployeeTransferred?.();
       }
     } catch (err: any) {
       toast.error(err.message || "Could not give out targets.");
@@ -575,6 +578,7 @@ export default function DepartmentHoldingPoolManager({
         setTransferReason("");
         refetchPool();
         refetchLedger();
+        onEmployeeTransferred?.();
       }
     } catch (err: any) {
       toast.error(err.message || "Could not transfer employee.");
@@ -623,6 +627,7 @@ export default function DepartmentHoldingPoolManager({
         setTransitionReason("");
         refetchPool();
         refetchLedger();
+        onEmployeeTransferred?.();
       }
     } catch (err: any) {
       toast.error(err.message || "Could not change role.");

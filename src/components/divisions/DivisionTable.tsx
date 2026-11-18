@@ -35,6 +35,8 @@ import { useDivisionMutations } from "@/hooks/divisions/useDivisionMutations";
 import { toast } from "sonner";
 import { SortableFilterableHeader } from "@/components/ui/sortable-filterable-header";
 import { useTableColumnControls } from "@/hooks/table/useTableColumnControls";
+import { usePermissions } from "@/hooks/permissions/usePermissions";
+import { useAuthStore } from "@/stores";
 
 // Division interface matching the design
 export interface Division {
@@ -43,6 +45,7 @@ export interface Division {
   createdBy: string;
   createdOn: string;
   managedBy: string;
+  headEmployeeId?: string | null;
   departments: number;
 }
 
@@ -81,6 +84,11 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
   readOnly = false,
 }) => {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const { guards, scope } = usePermissions();
+  const isGlobalAdmin = guards.isAdmin || guards.isSuperAdmin;
+  const canBulkDelete = !readOnly && isGlobalAdmin;
+
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(
     new Set()
   );
@@ -182,7 +190,7 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
   return (
     <>
       {/* Selection Action Bar - only show for admins */}
-      {!readOnly && someSelected && (
+      {canBulkDelete && someSelected && (
         <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
           <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
             {selectedIds.size} division{selectedIds.size !== 1 ? "s" : ""}{" "}
@@ -212,7 +220,7 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
         <TableHeader>
           <TableRow className="bg-muted/60 hover:bg-muted/60">
             {/* Only show checkbox column for admins */}
-            {!readOnly && (
+            {canBulkDelete && (
               <TableHead className="px-4 py-3 w-12">
                 <Checkbox
                   checked={allSelected}
@@ -268,7 +276,17 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
               </TableCell>
             </TableRow>
           ) : (
-            divisionsToShow.map((division, idx) => (
+            divisionsToShow.map((division, idx) => {
+              const isDivisionHead =
+                guards.isDirector &&
+                ((division.headEmployeeId && user?.employeeId && division.headEmployeeId === user.employeeId) ||
+                  (scope?.managedDivisionIds && scope.managedDivisionIds.includes(String(division.id))) ||
+                  (user?.fullName && division.managedBy === user.fullName));
+
+              const canManageThisDivision = !readOnly && (isGlobalAdmin || isDivisionHead);
+              const canDeleteThisDivision = !readOnly && isGlobalAdmin;
+
+              return (
               <TableRow
                 key={division.id}
                 className={`border-b border-gray-100 dark:border-gray-800 ${selectedIds.has(division.id)
@@ -282,7 +300,7 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
                 }
               >
                 {/* Only show checkbox for admins */}
-                {!readOnly && (
+                {canBulkDelete && (
                   <TableCell
                     className="px-4 py-4 w-12"
                     onClick={(e) => e.stopPropagation()}
@@ -325,8 +343,8 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
                     >
                       View
                     </Button>
-                    {/* Only show edit/delete actions for admins */}
-                    {!readOnly && (
+                    {/* Only show edit/delete actions for admins or division head */}
+                    {canManageThisDivision && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -368,28 +386,31 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
                               Edit
                             </DropdownMenuItem>
                           </EditDivisionDialog>
-                          <DeleteDivisionDialog
-                            divisionName={division.divisionName}
-                            divisionId={division.id}
-                            onDeleteSuccess={onDeleteSuccess}
-                          >
-                            <DropdownMenuItem
-                              className="text-red-600 flex items-center gap-2"
-                              onSelect={(e) => {
-                                e.preventDefault();
-                              }}
+                          {canDeleteThisDivision && (
+                            <DeleteDivisionDialog
+                              divisionName={division.divisionName}
+                              divisionId={division.id}
+                              onDeleteSuccess={onDeleteSuccess}
                             >
-                              <Trash2 className="h-4 w-4" color="red" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DeleteDivisionDialog>
+                              <DropdownMenuItem
+                                className="text-red-600 flex items-center gap-2"
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" color="red" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DeleteDivisionDialog>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
                   </div>
                 </TableCell>
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>

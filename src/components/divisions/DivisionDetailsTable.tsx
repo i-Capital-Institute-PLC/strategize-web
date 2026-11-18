@@ -82,6 +82,7 @@ interface DivisionDetailsTableProps {
   allMembers?: Array<{ employeeId: string; fullName: string }>;
   onEditSuccess?: () => void;
   onDeleteSuccess?: () => void;
+  readOnly?: boolean;
 }
 
 const DivisionDetailsTable: React.FC<DivisionDetailsTableProps> = ({
@@ -93,6 +94,7 @@ const DivisionDetailsTable: React.FC<DivisionDetailsTableProps> = ({
   allMembers = [],
   onEditSuccess,
   onDeleteSuccess,
+  readOnly = false,
 }) => {
   const router = useRouter();
   const departmentsToShow = propDepartments || mockDepartments;
@@ -155,52 +157,54 @@ const DivisionDetailsTable: React.FC<DivisionDetailsTableProps> = ({
                 >
                   View
                 </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <EditDepartmentDialog
-                      department={{
-                        id: dept.id,
-                        departmentName: dept.departmentName,
-                        managedBy: dept.managedBy,
-                        division: dept.division,
-                        members: dept.members,
-                      }}
-                      managers={managers}
-                      divisions={divisions}
-                      allMembers={allMembers}
-                      onEditSuccess={onEditSuccess}
-                    >
-                      <DropdownMenuItem
-                        onSelect={(e) => {
-                          e.preventDefault();
+                {!readOnly && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <EditDepartmentDialog
+                        department={{
+                          id: dept.id,
+                          departmentName: dept.departmentName,
+                          managedBy: dept.managedBy,
+                          division: dept.division,
+                          members: dept.members,
                         }}
+                        managers={managers}
+                        divisions={divisions}
+                        allMembers={allMembers}
+                        onEditSuccess={onEditSuccess}
                       >
-                        <Edit className="h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                    </EditDepartmentDialog>
-                    <DeleteDepartmentDialog
-                      departmentName={dept.departmentName}
-                      departmentId={dept.id}
-                      onDeleteSuccess={onDeleteSuccess}
-                    >
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onSelect={(e) => {
-                          e.preventDefault();
-                        }}
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                      </EditDepartmentDialog>
+                      <DeleteDepartmentDialog
+                        departmentName={dept.departmentName}
+                        departmentId={dept.id}
+                        onDeleteSuccess={onDeleteSuccess}
                       >
-                        <Trash2 className="h-4 w-4" color="red" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DeleteDepartmentDialog>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        <DropdownMenuItem
+                          className="text-red-600"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" color="red" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DeleteDepartmentDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </TableCell>
           </TableRow>

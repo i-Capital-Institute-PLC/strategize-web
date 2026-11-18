@@ -27,6 +27,7 @@ const DepartmentDetailsPage = () => {
     data: departmentData,
     loading,
     error,
+    refetch: refetchDepartment,
   } = useQuery<DepartmentData>(GET_DEPARTMENT, {
     variables: { departmentId },
     fetchPolicy: "cache-and-network",
@@ -196,6 +197,7 @@ const DepartmentDetailsPage = () => {
           departmentName={department.name}
           employees={(department.employees || []).filter((e: any) => e.status !== "DISABLED" && e.status !== "DELETED")}
           allDepartments={allDepartments}
+          onEmployeeTransferred={refetchDepartment}
         />
       )}
     </div>

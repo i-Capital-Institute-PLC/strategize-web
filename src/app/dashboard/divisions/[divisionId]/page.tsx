@@ -13,6 +13,7 @@ import { GET_DEPARTMENTS } from "@/lib/graphql/queries/departments";
 import { GET_EMPLOYEES } from "@/lib/graphql/queries/employees";
 import { useDepartmentMutations } from "@/hooks/departments/useDepartmentMutations";
 import { usePermissions } from "@/hooks/permissions/usePermissions";
+import { useAuthStore } from "@/stores";
 import type {
   GetDivisionResponse,
   DivisionQueryVariables,
@@ -31,7 +32,8 @@ const DivisionDetailsPage = () => {
   const [activeMainTab, setActiveMainTab] = useState<"departments" | "holding-pool">("departments");
 
   // Get permissions to check if user can access employees
-  const { guards } = usePermissions();
+  const { guards, scope } = usePermissions();
+  const user = useAuthStore((state) => state.user);
   const canAccessEmployees = guards.isAdmin || guards.isSuperAdmin;
 
   // Query to get basic division info (without departments to avoid manager constraint)
@@ -47,6 +49,14 @@ const DivisionDetailsPage = () => {
       nextFetchPolicy: "cache-first",
     }
   );
+
+  const isGlobalAdmin = guards.isAdmin || guards.isSuperAdmin;
+  const isMyDivision =
+    isGlobalAdmin ||
+    (guards.isDirector &&
+      (divisionData?.division?.head?.employeeId === user?.employeeId ||
+        (scope?.managedDivisionIds && scope.managedDivisionIds.includes(divisionId)) ||
+        (user?.fullName && divisionData?.division?.head?.fullName === user.fullName)));
 
   // Query to get departments for this division
   const {
@@ -202,15 +212,22 @@ const DivisionDetailsPage = () => {
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl md:text-4xl text-[#3F3F46] font-bold tracking-tight">
-              {divisionName}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-4xl text-[#3F3F46] dark:text-gray-100 font-bold tracking-tight">
+                {divisionName}
+              </h1>
+              {!isMyDivision && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                  Read-Only View
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               Division Management, Quotas & Department Allocation
             </p>
           </div>
         </div>
-        {activeMainTab === "departments" && (
+        {activeMainTab === "departments" && isMyDivision && (
           <Button onClick={handleAddDepartment} disabled={loading}>
             <Plus width={16} height={16} />
             Add Department
@@ -266,6 +283,7 @@ const DivisionDetailsPage = () => {
               }))}
               onEditSuccess={() => refetchDepartments()}
               onDeleteSuccess={() => refetchDepartments()}
+              readOnly={!isMyDivision}
             />
           </div>
 
@@ -284,6 +302,7 @@ const DivisionDetailsPage = () => {
           divisionId={divisionId}
           divisionName={divisionName}
           departments={departments}
+          readOnly={!isMyDivision}
         />
       )}
 
