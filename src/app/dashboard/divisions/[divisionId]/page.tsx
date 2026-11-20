@@ -68,10 +68,11 @@ const DivisionDetailsPage = () => {
   }>(GET_DEPARTMENTS, {
     variables: {
       page: currentPage,
-      limit: itemsPerPage,
+      limit: 50,
+      divisionId: divisionId,
     },
-    fetchPolicy: "cache-first",
-    nextFetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-and-network",
   });
 
   // Query to get employees for manager selection
@@ -112,7 +113,8 @@ const DivisionDetailsPage = () => {
   const departments =
     departmentsData?.departments?.items
       ?.filter(
-        (dept: GraphQLDepartment) => dept.division?.divisionId === divisionId
+        (dept: GraphQLDepartment) =>
+          dept.division?.divisionId === divisionId && !dept.isDeleted
       )
       ?.map((dept: GraphQLDepartment) => ({
         id: dept.departmentId,
@@ -126,6 +128,8 @@ const DivisionDetailsPage = () => {
           minute: "2-digit",
         }),
         managedBy: dept.head?.fullName || "Unassigned",
+        managerId: dept.head?.employeeId || null,
+        managerEmail: dept.head?.email || null,
         division: divisionName,
         members: dept.employees?.length || 0,
       })) || [];
@@ -247,7 +251,7 @@ const DivisionDetailsPage = () => {
           }`}
         >
           <Building2 className="w-4 h-4" />
-          Departments & Overview
+          Departments
         </button>
         <button
           type="button"
@@ -259,7 +263,7 @@ const DivisionDetailsPage = () => {
           }`}
         >
           <Layers className="w-4 h-4" />
-          Division Holding Pool & Inter-Dept Rebalance
+          Holding Pool
         </button>
       </div>
 
@@ -283,6 +287,7 @@ const DivisionDetailsPage = () => {
               }))}
               onEditSuccess={() => refetchDepartments()}
               onDeleteSuccess={() => refetchDepartments()}
+              onDepartManager={() => setActiveMainTab("holding-pool")}
               readOnly={!isMyDivision}
             />
           </div>

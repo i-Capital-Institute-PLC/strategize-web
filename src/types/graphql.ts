@@ -972,6 +972,9 @@ export interface KpisQueryVariables {
   page?: number;
   limit?: number;
   search?: string;
+  organizationId?: string;
+  strategicObjectiveId?: string;
+  assigneeId?: string;
 }
 
 export interface KpiQueryVariables {

@@ -512,6 +512,7 @@ export default function NotificationDropdown() {
           url = `/dashboard/evaluations`;
           break;
         case "approval":
+        case "submission":
           url = `/dashboard/approvals`;
           break;
         case "logbook_entry":

@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, Building2, Eye, Award } from "lucide-react";
+import { MoreVertical, Edit, Trash2, Building2, Eye, Award, ArrowUpDown } from "lucide-react";
 import DeleteEmployeeDialog from "./DeleteEmployeeDialog";
 import EditEmployeeDialog from "./EditEmployeeDialog";
 import ViewEmployeeDialog from "./ViewEmployeeDialog";
@@ -57,8 +57,8 @@ const EmployeeActionsMenu = ({
               className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 font-medium"
               onSelect={(e) => e.preventDefault()}
             >
-              <Award className="h-4 w-4" />
-              Promote / Change Role
+              <ArrowUpDown className="h-4 w-4" />
+              Promotion / Demotion
             </DropdownMenuItem>
           </PromoteEmployeeDialog>
         )}

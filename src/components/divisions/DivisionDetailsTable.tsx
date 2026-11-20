@@ -2,7 +2,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit, MoreVertical, Trash2 } from "lucide-react";
+import { Edit, MoreVertical, Trash2, UserMinus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ export interface Department {
   createdBy: string;
   createdOn: string;
   managedBy: string;
+  managerId?: string | null;
   division: string;
   members: number;
 }
@@ -82,6 +83,7 @@ interface DivisionDetailsTableProps {
   allMembers?: Array<{ employeeId: string; fullName: string }>;
   onEditSuccess?: () => void;
   onDeleteSuccess?: () => void;
+  onDepartManager?: (dept: Department) => void;
   readOnly?: boolean;
 }
 
@@ -94,6 +96,7 @@ const DivisionDetailsTable: React.FC<DivisionDetailsTableProps> = ({
   allMembers = [],
   onEditSuccess,
   onDeleteSuccess,
+  onDepartManager,
   readOnly = false,
 }) => {
   const router = useRouter();
@@ -202,6 +205,15 @@ const DivisionDetailsTable: React.FC<DivisionDetailsTableProps> = ({
                           Delete
                         </DropdownMenuItem>
                       </DeleteDepartmentDialog>
+                      {dept.managedBy && dept.managedBy !== "Unassigned" && onDepartManager && (
+                        <DropdownMenuItem
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-medium"
+                          onSelect={() => onDepartManager(dept)}
+                        >
+                          <UserMinus className="h-4 w-4 mr-2" />
+                          Depart Manager
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}

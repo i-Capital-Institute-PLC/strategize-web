@@ -26,6 +26,7 @@ import {
   PaginatedEmployees,
 } from "@/types/graphql";
 import { toast } from "sonner";
+import { useAuthStore } from "@/stores";
 
 const DepartmentsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,10 +42,15 @@ const DepartmentsPage = () => {
   >("all");
 
   // Get permissions to check if user can access employees
+  const user = useAuthStore((state) => state.user);
   const { guards, scope, isLoading: permissionsLoading } = usePermissions();
   const canAccessEmployees = guards.isAdmin || guards.isSuperAdmin;
   const isAdmin = guards.isAdmin || guards.isSuperAdmin;
   const isManagement = guards.isDirector || guards.isManager;
+  const managerDeptId =
+    scope?.managedDepartmentIds?.[0] ||
+    scope?.departmentIds?.[0] ||
+    user?.departments?.[0]?.departmentId;
 
   // GraphQL queries
   const {
@@ -82,8 +88,8 @@ const DepartmentsPage = () => {
     error: departmentError,
     refetch: departmentRefetch,
   } = useQuery<{ department: any }>(GET_DEPARTMENT_SAFE, {
-    variables: { departmentId: scope?.managedDepartmentIds[0] },
-    skip: !guards.isManager || !scope?.managedDepartmentIds?.[0],
+    variables: { departmentId: managerDeptId },
+    skip: !guards.isManager || !managerDeptId,
     fetchPolicy: "cache-first",
     nextFetchPolicy: "cache-first",
   });
@@ -145,9 +151,17 @@ const DepartmentsPage = () => {
     if (isAdmin) {
       rawItems = globalDepartmentsData?.departments?.items || [];
     } else if (guards.isDirector) {
-      rawItems = scopedDivisionData?.division?.departments || [];
+      rawItems = (scopedDivisionData?.division?.departments || []).filter(
+        (dept: any) => !dept.isDeleted,
+      );
     } else if (guards.isManager) {
-      rawItems = scopedDepartmentData?.department ? [scopedDepartmentData.department] : [];
+      if (scopedDepartmentData?.department) {
+        rawItems = [scopedDepartmentData.department];
+      } else if (user?.departments?.length) {
+        rawItems = user.departments as any[];
+      } else {
+        rawItems = [];
+      }
     }
 
     let filteredDepartments = [...rawItems];

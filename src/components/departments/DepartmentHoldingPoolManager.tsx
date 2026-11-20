@@ -42,6 +42,7 @@ import {
 import { toast } from "sonner";
 import {
   ArrowRightLeft,
+  ArrowUpDown,
   CheckCircle2,
   Clock,
   History,
@@ -248,7 +249,22 @@ export default function DepartmentHoldingPoolManager({
   }, [user]);
 
   // Helper to identify KPI unit types
+  const isPercent = (kpi: any) => {
+    const type = (kpi?.unitType || "").toUpperCase();
+    const unit = (kpi?.measurementUnit || "").toUpperCase();
+    const name = (kpi?.kpiName || kpi?.name || "").toUpperCase();
+    return (
+      type === "PERCENT" ||
+      type === "PERCENTAGE" ||
+      unit.includes("PERCENT") ||
+      unit.includes("%") ||
+      name.includes("RATE") ||
+      name.includes("RATIO")
+    );
+  };
+
   const isCurrency = (kpi: any) => {
+    if (isPercent(kpi)) return false;
     const type = (kpi?.unitType || "").toUpperCase();
     const unit = (kpi?.measurementUnit || "").toUpperCase();
     const name = (kpi?.kpiName || kpi?.name || "").toUpperCase();
@@ -264,17 +280,6 @@ export default function DepartmentHoldingPoolManager({
       name.includes("REVENUE") ||
       (name.includes("VALUE") && !isPercent(kpi)) ||
       Number(kpi?.annualDepartmentTarget || 0) >= 1000000
-    );
-  };
-
-  const isPercent = (kpi: any) => {
-    const type = (kpi?.unitType || "").toUpperCase();
-    const unit = (kpi?.measurementUnit || "").toUpperCase();
-    return (
-      type === "PERCENT" ||
-      type === "PERCENTAGE" ||
-      unit.includes("PERCENT") ||
-      unit.includes("%")
     );
   };
 
@@ -522,8 +527,8 @@ export default function DepartmentHoldingPoolManager({
   // Handle Distribution
   const handleDistributeQuota = async () => {
     const finalAmountToAssign = prorationEnabled ? effectiveDelta : quotaDelta;
-    if (!recipientEmpId || finalAmountToAssign <= 0 || !distributeReason) {
-      toast.error("Please select an employee, enter target amount, and write a reason.");
+    if (!recipientEmpId || finalAmountToAssign <= 0) {
+      toast.error("Please select an employee and enter a target amount.");
       return;
     }
 
@@ -561,7 +566,7 @@ export default function DepartmentHoldingPoolManager({
                 totalQuarterDays: prorationEnabled ? safeTotalQuarterDays : null,
               },
             ],
-            reason: distributeReason,
+            reason: distributeReason?.trim() || "Holding pool quota allocation",
           },
         },
       });
@@ -705,8 +710,8 @@ export default function DepartmentHoldingPoolManager({
             onClick={() => setTransitionOpen(true)}
             className="rounded-xl gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
           >
-            <TrendingUp className="h-4 w-4" />
-            Change Role / Promotion
+            <ArrowUpDown className="h-4 w-4" />
+            Promotion / Demotion
           </Button>
 
           <Button
@@ -1088,9 +1093,13 @@ export default function DepartmentHoldingPoolManager({
                   {/* Quarters Grid */}
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
                     {kpi.quarters.map((q: any) => {
-                      const hasPool = q.poolBalance > 0;
+                      const isPercentage = isPercent(kpi);
+                      const hasPool = isPercentage ? true : q.poolBalance > 0;
                       const isPast = q.quarterNumber < currentQuarterNum;
                       const isCurrent = q.quarterNumber === currentQuarterNum;
+                      const defaultQuota = isPercentage
+                        ? (q.poolBalance > 0 ? q.poolBalance : (q.departmentTarget || 100))
+                        : q.poolBalance;
 
                       const formatVal = (val: number) => {
                         if (kpiIsCurrency) {
@@ -1212,14 +1221,14 @@ export default function DepartmentHoldingPoolManager({
                                   onClick={() => {
                                     setSelectedKpiForDist(kpi);
                                     setSelectedQuarterForDist(q.quarterNumber);
-                                    setQuotaDelta(q.poolBalance);
+                                    setQuotaDelta(defaultQuota);
                                     setDistributeOpen(true);
                                   }}
                                   className="w-full rounded-lg text-xs font-semibold gap-1.5 text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs px-2"
-                                  title={getAssignButtonText(q.poolBalance, kpi)}
+                                  title={getAssignButtonText(defaultQuota, kpi)}
                                 >
                                   <UserPlus className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="truncate">{getAssignButtonText(q.poolBalance, kpi)}</span>
+                                  <span className="truncate">{getAssignButtonText(defaultQuota, kpi)}</span>
                                 </Button>
                               ) : (
                                 <div className="text-center py-1.5 text-[11px] text-slate-400 font-medium">
@@ -1790,10 +1799,10 @@ export default function DepartmentHoldingPoolManager({
             </div>
 
             <div>
-              <Label>Note / Reason</Label>
+              <Label>Note / Reason (Optional)</Label>
               <Input
                 className="mt-1"
-                placeholder="e.g. New hire joining mid-quarter..."
+                placeholder="e.g. New hire joining mid-quarter (optional)..."
                 value={distributeReason}
                 onChange={(e) => setDistributeReason(e.target.value)}
               />
@@ -1915,7 +1924,7 @@ export default function DepartmentHoldingPoolManager({
         </DialogContent>
       </Dialog>
 
-      {/* Modal 4: Change Role / Promotion */}
+      {/* Modal 4: Promotion / Demotion */}
       {selectedEmpForTransition ? (
         <PromoteEmployeeDialog
           employee={selectedEmpForTransition as any}

@@ -158,12 +158,8 @@ export default function KpiAssignmentDialog({
     variables: {
       page: 1,
       limit: 1000,
-      // Only admins can see all employees, others see department employees
-      ...(isAdmin ? {} : { departmentId: user?.department?.departmentId }),
     },
-    skip:
-      assignmentType !== "EMPLOYEE" ||
-      (!isAdmin && !user?.department?.departmentId),
+    skip: assignmentType !== "EMPLOYEE",
   });
 
   // Fetch departments

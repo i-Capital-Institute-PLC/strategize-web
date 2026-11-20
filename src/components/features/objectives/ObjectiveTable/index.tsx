@@ -106,8 +106,13 @@ const ObjectiveTable: React.FC<ObjectiveTableProps> = (props) => {
       {
         id: "progress",
         accessor: (obj: Objective) =>
-          kpis.filter((k) => k.objective?.objectiveId === obj.objectiveId)
-            .length,
+          obj.kpis && obj.kpis.length > 0
+            ? obj.kpis.length
+            : kpis.filter(
+                (k) =>
+                  k.objective?.objectiveId === obj.objectiveId ||
+                  (k as any).strategicObjectiveId === obj.objectiveId,
+              ).length,
       },
       {
         id: "status",
@@ -259,9 +264,15 @@ const ObjectiveTable: React.FC<ObjectiveTableProps> = (props) => {
           }
 
           const groupWeight = groupObjectives.reduce((total, obj) => {
-            const objKPIs = kpis.filter(
-              (k) => k.objective?.objectiveId === obj.objectiveId && k.status !== "REJECTED"
-            );
+            const objKPIs =
+              obj.kpis && obj.kpis.length > 0
+                ? (obj.kpis as Kpi[]).filter((k) => k.status !== "REJECTED")
+                : kpis.filter(
+                    (k) =>
+                      (k.objective?.objectiveId === obj.objectiveId ||
+                        (k as any).strategicObjectiveId === obj.objectiveId) &&
+                      k.status !== "REJECTED",
+                  );
             return total + objKPIs.reduce((sum, kpi) => sum + (kpi.weight || 0), 0);
           }, 0);
 
@@ -327,9 +338,15 @@ const ObjectiveTable: React.FC<ObjectiveTableProps> = (props) => {
                     {expanded === obj.objectiveId && (
                       <ExpandedKPIs
                         objective={obj}
-                        objectiveKPIs={kpis.filter(
-                          (k) => k.objective?.objectiveId === obj.objectiveId,
-                        )}
+                        objectiveKPIs={
+                          obj.kpis && obj.kpis.length > 0
+                            ? (obj.kpis as Kpi[])
+                            : kpis.filter(
+                                (k) =>
+                                  k.objective?.objectiveId === obj.objectiveId ||
+                                  (k as any).strategicObjectiveId === obj.objectiveId,
+                              )
+                        }
                         totalColumnCount={totalColumnCount}
                         showReasonColumn={
                           !objectives.every((o) => o.type === "CORPORATE") &&
