@@ -29,7 +29,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-pnpm-lock.yaml
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
@@ -90,4 +89,3 @@ docs/**/*.md
 !docs/data-validation/TARGET_VALIDATION_SYSTEM.md
 !docs/data-validation/TIMELINE_AND_TARGET_FIXES.md
 !docs/data-validation/STRATEGIC_OBJECTIVES_DICTIONARY.md
-pnpm-lock.yaml

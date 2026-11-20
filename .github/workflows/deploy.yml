@@ -1,14 +1,24 @@
-name: Deploy to Server
+name: Deploy to GCP Server
 
 on:
   push:
     branches:
       - main
       - new-update
+  # Allows re-deploying manually from the Actions tab
+  workflow_dispatch:
+
+# Never run two deploys at once on the same server; a newer push cancels the older run
+concurrency:
+  group: deploy-strategize-web
+  cancel-in-progress: true
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    # Runs on the self-hosted runner installed on the GCP VM
+    # (registered with the extra label "gcp" by scripts/setup-gcp-runner.sh)
+    runs-on: [self-hosted, linux, gcp]
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
