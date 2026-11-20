@@ -1332,9 +1332,16 @@ export default function CheckInPage() {
   };
 
   // Show session list view
+  const isOffboarded = currentUser?.status === "DISABLED";
+
   if (view === "list") {
     return (
       <div className="h-full">
+        {isOffboarded && (
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 shadow-2xs dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <strong>Account Offboarded:</strong> Historical check-in sessions and completed tasks are preserved for your records. Check-in submissions and new task planning are closed.
+          </div>
+        )}
         <div className="flex justify-end mb-4">
           <SyncButton onSync={handleSyncCheckin} label="Sync" />
         </div>

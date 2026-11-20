@@ -3,15 +3,17 @@ import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@apollo/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Building2, Layers } from "lucide-react";
 import DivisionDetailsTable from "@/components/divisions/DivisionDetailsTable";
 import DivisionPagination from "@/components/divisions/DivisionPagination";
 import AddDepartmentDialog from "@/components/departments/AddDepartmentDialog";
+import DivisionHoldingPoolManager from "@/components/divisions/DivisionHoldingPoolManager";
 import { GET_DIVISION_BASIC } from "@/lib/graphql/queries/divisions";
 import { GET_DEPARTMENTS } from "@/lib/graphql/queries/departments";
 import { GET_EMPLOYEES } from "@/lib/graphql/queries/employees";
 import { useDepartmentMutations } from "@/hooks/departments/useDepartmentMutations";
 import { usePermissions } from "@/hooks/permissions/usePermissions";
+import { useAuthStore } from "@/stores";
 import type {
   GetDivisionResponse,
   DivisionQueryVariables,
@@ -27,9 +29,11 @@ const DivisionDetailsPage = () => {
   const divisionId = params.divisionId as string;
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [activeMainTab, setActiveMainTab] = useState<"departments" | "holding-pool">("departments");
 
   // Get permissions to check if user can access employees
-  const { guards } = usePermissions();
+  const { guards, scope } = usePermissions();
+  const user = useAuthStore((state) => state.user);
   const canAccessEmployees = guards.isAdmin || guards.isSuperAdmin;
 
   // Query to get basic division info (without departments to avoid manager constraint)
@@ -46,6 +50,14 @@ const DivisionDetailsPage = () => {
     }
   );
 
+  const isGlobalAdmin = guards.isAdmin || guards.isSuperAdmin;
+  const isMyDivision =
+    isGlobalAdmin ||
+    (guards.isDirector &&
+      (divisionData?.division?.head?.employeeId === user?.employeeId ||
+        (scope?.managedDivisionIds && scope.managedDivisionIds.includes(divisionId)) ||
+        (user?.fullName && divisionData?.division?.head?.fullName === user.fullName)));
+
   // Query to get departments for this division
   const {
     data: departmentsData,
@@ -56,10 +68,11 @@ const DivisionDetailsPage = () => {
   }>(GET_DEPARTMENTS, {
     variables: {
       page: currentPage,
-      limit: itemsPerPage,
+      limit: 50,
+      divisionId: divisionId,
     },
-    fetchPolicy: "cache-first",
-    nextFetchPolicy: "cache-first",
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-and-network",
   });
 
   // Query to get employees for manager selection
@@ -100,7 +113,8 @@ const DivisionDetailsPage = () => {
   const departments =
     departmentsData?.departments?.items
       ?.filter(
-        (dept: GraphQLDepartment) => dept.division?.divisionId === divisionId
+        (dept: GraphQLDepartment) =>
+          dept.division?.divisionId === divisionId && !dept.isDeleted
       )
       ?.map((dept: GraphQLDepartment) => ({
         id: dept.departmentId,
@@ -114,6 +128,8 @@ const DivisionDetailsPage = () => {
           minute: "2-digit",
         }),
         managedBy: dept.head?.fullName || "Unassigned",
+        managerId: dept.head?.employeeId || null,
+        managerEmail: dept.head?.email || null,
         division: divisionName,
         members: dept.employees?.length || 0,
       })) || [];
@@ -199,45 +215,101 @@ const DivisionDetailsPage = () => {
           >
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
-          <h1 className="text-2xl md:text-4xl text-[#3F3F46] font-bold tracking-tight">
-            {divisionName}
-          </h1>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-4xl text-[#3F3F46] dark:text-gray-100 font-bold tracking-tight">
+                {divisionName}
+              </h1>
+              {!isMyDivision && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                  Read-Only View
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Division Management, Quotas & Department Allocation
+            </p>
+          </div>
         </div>
-        <Button onClick={handleAddDepartment} disabled={loading}>
-          <Plus width={16} height={16} />
-          Add Department
-        </Button>
+        {activeMainTab === "departments" && isMyDivision && (
+          <Button onClick={handleAddDepartment} disabled={loading}>
+            <Plus width={16} height={16} />
+            Add Department
+          </Button>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="dark:bg-muted rounded-lg border overflow-x-auto custom-scrollbar">
-        <DivisionDetailsTable
+      {/* Main View Tabs */}
+      <div className="flex border-b border-gray-200 dark:border-gray-800 space-x-6">
+        <button
+          type="button"
+          onClick={() => setActiveMainTab("departments")}
+          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+            activeMainTab === "departments"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          Departments
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMainTab("holding-pool")}
+          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+            activeMainTab === "holding-pool"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          Holding Pool
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeMainTab === "departments" ? (
+        <>
+          {/* Table */}
+          <div className="dark:bg-muted rounded-lg border overflow-x-auto custom-scrollbar">
+            <DivisionDetailsTable
+              departments={departments}
+              loading={loading}
+              error={divisionError ? String(divisionError) : undefined}
+              managers={managers.map((m) => ({
+                employeeId: m.employeeId,
+                fullName: m.fullName,
+              }))}
+              divisions={[{ divisionId: divisionId, name: divisionName }]}
+              allMembers={allEmployees.map((e) => ({
+                employeeId: e.employeeId,
+                fullName: e.fullName,
+              }))}
+              onEditSuccess={() => refetchDepartments()}
+              onDeleteSuccess={() => refetchDepartments()}
+              onDepartManager={() => setActiveMainTab("holding-pool")}
+              readOnly={!isMyDivision}
+            />
+          </div>
+
+          {/* Pagination */}
+          <DivisionPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+            loading={loading}
+          />
+        </>
+      ) : (
+        <DivisionHoldingPoolManager
+          divisionId={divisionId}
+          divisionName={divisionName}
           departments={departments}
-          loading={loading}
-          error={divisionError ? String(divisionError) : undefined}
-          managers={managers.map((m) => ({
-            employeeId: m.employeeId,
-            fullName: m.fullName,
-          }))}
-          divisions={[{ divisionId: divisionId, name: divisionName }]}
-          allMembers={allEmployees.map((e) => ({
-            employeeId: e.employeeId,
-            fullName: e.fullName,
-          }))}
-          onEditSuccess={() => refetchDepartments()}
-          onDeleteSuccess={() => refetchDepartments()}
+          readOnly={!isMyDivision}
         />
-      </div>
-
-      {/* Pagination */}
-      <DivisionPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        itemsPerPage={itemsPerPage}
-        onPageChange={handlePageChange}
-        loading={loading}
-      />
+      )}
 
       {/* Add Department Dialog */}
       <AddDepartmentDialog

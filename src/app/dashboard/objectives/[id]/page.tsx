@@ -63,6 +63,7 @@ export default function ObjectiveDetailPage() {
     // Fetch a large page so client-side filtering by objectiveId doesn't miss items=
     page: 1,
     limit: 1000,
+    strategicObjectiveId: objectiveId,
   });
 
   // Fetch divisions and departments to resolve assignee name
@@ -152,10 +153,52 @@ export default function ObjectiveDetailPage() {
     return reasonsMap;
   }, [submissionsData]);
 
-  // Filter KPIs for this specific objective (handle null objectives)
-  const objectiveKPIs = kpis.filter(
-    (kpi) => kpi.objective?.objectiveId === objectiveId,
-  );
+  // Filter KPIs for this specific objective (handle null objectives, fallback to embedded objective.kpis)
+  const objectiveKPIs = useMemo(() => {
+    const fromGlobal = kpis.filter(
+      (kpi) =>
+        kpi.objective?.objectiveId === objectiveId ||
+        (kpi as any).strategicObjectiveId === objectiveId,
+    );
+    const sourceList =
+      fromGlobal.length > 0
+        ? fromGlobal
+        : kpis.length > 0
+          ? kpis
+          : ((objective?.kpis ?? []) as unknown as Kpi[]);
+
+    // For Department/Division unit objectives, only display the parent department-level KPIs.
+    // Exclude individual employee child KPIs cascaded from those parent KPIs so they don't appear as duplicates.
+    const isUnitObjective =
+      objective?.type === "DEPARTMENT" ||
+      objective?.type === "DIVISION" ||
+      objective?.assigneeType === "DEPARTMENT" ||
+      objective?.assigneeType === "DIVISION";
+
+    if (isUnitObjective) {
+      const parentIdsInList = new Set(sourceList.map((k) => k.kpiId));
+      return sourceList.filter((kpi) => {
+        const parentKpiId = kpi.parent?.kpiId || (kpi as any).parentId;
+        if (parentKpiId && parentIdsInList.has(parentKpiId)) return false;
+        if (
+          (kpi.assigneeType === "PERSONNEL" ||
+            (kpi as any).assigneeType === "EMPLOYEE") &&
+          parentKpiId
+        ) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return sourceList;
+  }, [
+    kpis,
+    objectiveId,
+    objective?.kpis,
+    objective?.type,
+    objective?.assigneeType,
+  ]);
   const objectiveLocalKPIs = ((objective?.kpis ?? []) as unknown as Kpi[]);
   const contributionLinks = contributionLinksData?.kpiContributionLinks?.items ?? [];
   const contributionLinksByKpi = useMemo(() => {
@@ -786,12 +829,12 @@ export default function ObjectiveDetailPage() {
             </div>
           )}
 
-        {kpisLoading ? (
+        {kpisLoading && objectiveKPIs.length === 0 ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-2 text-gray-600">Loading KPIs...</p>
           </div>
-        ) : kpisError ? (
+        ) : kpisError && objectiveKPIs.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-red-600">
               Error loading KPIs: {kpisError.message}
@@ -809,9 +852,12 @@ export default function ObjectiveDetailPage() {
         ) : (
           <KPIList
             kpis={objectiveKPIs}
-            allKpis={kpis}
+            allKpis={kpis.length > 0 ? kpis : objectiveKPIs}
             onEdit={handleEditKPI}
-            onRefresh={refetch}
+            onRefresh={async () => {
+              await refetch();
+              await refetchObjective();
+            }}
             selected={selectedKPIs}
             onSelect={handleSelectKPI}
             onSelectAll={handleSelectAllKPIs}

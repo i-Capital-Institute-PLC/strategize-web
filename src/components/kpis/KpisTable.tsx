@@ -54,6 +54,7 @@ import { CreateKpiDialog } from "@/components/kpis/CreateKpiDialog";
 import KpiAssignmentDialog from "@/components/kpis/KpiAssignmentDialog";
 import { KpiModeBadge } from "@/components/kpis/KpiModeBadge";
 import { useSelectedStrategicPeriod } from "@/stores/strategicPeriodStore";
+import { useAuthStore } from "@/stores";
 import { SortableFilterableHeader } from "@/components/ui/sortable-filterable-header";
 import { useTableColumnControls } from "@/hooks/table/useTableColumnControls";
 
@@ -94,6 +95,8 @@ const kpiTypeConfig: Record<string, { label: string; className: string }> = {
 
 export default function KpisTable({ kpis, loading, organizationId }: KpisTableProps) {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const isOffboarded = user?.status === "DISABLED";
   const { deleteKpi, loading: mutLoading } = useKpiMutations();
   const selectedPeriod = useSelectedStrategicPeriod();
 
@@ -370,7 +373,9 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
                           <Eye className="mr-2 h-4 w-4" /> View Details
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          disabled={isOffboarded}
                           onClick={(e) => {
+                            if (isOffboarded) return;
                             e.stopPropagation();
                             setEditKpi(kpi);
                           }}
@@ -379,17 +384,20 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => {
+                            if (isOffboarded) return;
                             e.stopPropagation();
                             setAssignKpi(kpi);
                           }}
-                          disabled={!selectedPeriod || (kpi as any).kpiMode === "DIRECT"}
+                          disabled={isOffboarded || !selectedPeriod || (kpi as any).kpiMode === "DIRECT"}
                         >
                           <UserPlus className="mr-2 h-4 w-4" />
                           {(kpi as any).kpiMode === "DIRECT" ? "Assign (DIRECT mode)" : "Assign"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          disabled={isOffboarded}
                           className="text-red-600"
                           onClick={(e) => {
+                            if (isOffboarded) return;
                             e.stopPropagation();
                             setDeleteKpiItem(kpi);
                           }}
@@ -456,7 +464,9 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
                       <Eye className="mr-2 h-4 w-4" /> View Details
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      disabled={isOffboarded}
                       onClick={(e) => {
+                        if (isOffboarded) return;
                         e.stopPropagation();
                         setEditKpi(kpi);
                       }}
@@ -465,16 +475,19 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={(e) => {
+                        if (isOffboarded) return;
                         e.stopPropagation();
                         setAssignKpi(kpi);
                       }}
-                      disabled={!selectedPeriod || (kpi as any).kpiMode === "DIRECT"}
+                      disabled={isOffboarded || !selectedPeriod || (kpi as any).kpiMode === "DIRECT"}
                     >
                       <UserPlus className="mr-2 h-4 w-4" /> Assign
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      disabled={isOffboarded}
                       className="text-red-600"
                       onClick={(e) => {
+                        if (isOffboarded) return;
                         e.stopPropagation();
                         setDeleteKpiItem(kpi);
                       }}

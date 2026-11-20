@@ -293,7 +293,11 @@ export default function NotificationsPage() {
           url = `/dashboard/evaluations`;
           break;
         case "approval":
+        case "submission":
           url = `/dashboard/approvals`;
+          break;
+        case "departureclearancerequest":
+          url = `/dashboard/departments`;
           break;
         case "logbook_entry":
         case "logbookentry":

@@ -19,7 +19,7 @@ const ROUTE_POLICIES: Record<string, RoutePolicy> = {
   "/dashboard/positions": { allowedRoles: ["HR", "SUPER_ADMIN"] },
   "/dashboard/teams": { allowedRoles: ["HR", "SUPER_ADMIN"] },
   "/dashboard/divisions": { minimumRole: "DIRECTOR" },
-  "/dashboard/departments": { minimumRole: "DIRECTOR" },
+  "/dashboard/departments": { minimumRole: "MANAGER" },
   "/dashboard/approvals": { minimumRole: "COORDINATOR" },
   "/dashboard/structure": { minimumRole: "NORMAL" },
   "/strategy-period/new": { allowedRoles: ["SUPER_ADMIN"] },

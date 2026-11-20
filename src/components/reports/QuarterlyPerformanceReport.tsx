@@ -975,7 +975,19 @@ export default function QuarterlyPerformanceReport() {
                             {row.kpiName}
                           </div>
                           <div className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
-                            {row.entityName} · {levelLabel(row.level)}
+                            <span className="flex flex-wrap items-center gap-1.5">
+                              <span>{row.entityName}</span>
+                              {row.employeeStatus && row.employeeStatus !== "ACTIVE" && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                                >
+                                  Departed
+                                </Badge>
+                              )}
+                              <span>·</span>
+                              <span>{levelLabel(row.level)}</span>
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1224,6 +1236,15 @@ function QuarterDetailDialog({
             <Badge variant="secondary" className="rounded-full text-[11px] font-semibold">
               {modeLabel(row.kpiMode)}
             </Badge>
+
+            {row.employeeStatus && row.employeeStatus !== "ACTIVE" && (
+              <Badge
+                variant="outline"
+                className="border-amber-300 bg-amber-50 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+              >
+                Departed (Read-Only)
+              </Badge>
+            )}
           </div>
           <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">
             {row.kpiName}

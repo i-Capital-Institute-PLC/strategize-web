@@ -574,7 +574,15 @@ export const GET_KPI_ASSIGNMENTS_EMPLOYEE = gql`
           name
           description
           measurementUnit
+          unitType
           kpiType
+          parentId
+          parent {
+            kpiId
+            name
+            assigneeType
+            assigneeId
+          }
         }
         employee {
           employeeId
@@ -628,7 +636,15 @@ export const GET_KPI_ASSIGNMENTS_DEPARTMENT = gql`
           name
           description
           measurementUnit
+          unitType
           kpiType
+          parentId
+          parent {
+            kpiId
+            name
+            assigneeType
+            assigneeId
+          }
         }
         department {
           departmentId
@@ -680,7 +696,15 @@ export const GET_KPI_ASSIGNMENTS_DIVISION = gql`
           name
           description
           measurementUnit
+          unitType
           kpiType
+          parentId
+          parent {
+            kpiId
+            name
+            assigneeType
+            assigneeId
+          }
         }
         division {
           divisionId
@@ -733,7 +757,15 @@ export const GET_KPI_ASSIGNMENTS_CORPORATE = gql`
           name
           description
           measurementUnit
+          unitType
           kpiType
+          parentId
+          parent {
+            kpiId
+            name
+            assigneeType
+            assigneeId
+          }
         }
         organization {
           organizationId

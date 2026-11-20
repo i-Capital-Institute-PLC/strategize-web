@@ -62,13 +62,24 @@ export function buildUserScope(
   const level = getScopeLevel(role);
 
   // Get IDs of managed units
+  const userDeptIds = (user.departments || []).map((d) => d.departmentId);
+  const isManagerRole =
+    role === 'MANAGER' ||
+    role === 'COORDINATOR' ||
+    Boolean(user.title && /manager|head/i.test(user.title));
+
   const managedDivisionIds = managedDivisions
-    .filter(d => d.head?.employeeId === user.employeeId)
+    .filter(d => d.head?.employeeId === user.employeeId || (d as any).headUserId === user.employeeId)
     .map(d => d.divisionId);
 
-  const managedDepartmentIds = managedDepartments
-    .filter(d => d.head?.employeeId === user.employeeId)
-    .map(d => d.departmentId);
+  const managedDepartmentIds = [
+    ...new Set([
+      ...managedDepartments
+        .filter(d => d.head?.employeeId === user.employeeId || (d as any).headUserId === user.employeeId)
+        .map(d => d.departmentId),
+      ...(isManagerRole ? userDeptIds : []),
+    ]),
+  ];
 
   // Build accessible IDs based on role
   let divisionIds: string[] = [];

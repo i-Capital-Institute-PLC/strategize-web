@@ -700,6 +700,7 @@ export interface KpiQuarterReportRow {
   departmentName?: string | null;
   employeeId?: string | null;
   employeeName?: string | null;
+  employeeStatus?: string | null;
   kpiMode: KpiMode;
   aggregationMethod: KpiAggregationMethod;
   weightingBasisKpiId?: string | null;
@@ -971,6 +972,9 @@ export interface KpisQueryVariables {
   page?: number;
   limit?: number;
   search?: string;
+  organizationId?: string;
+  strategicObjectiveId?: string;
+  assigneeId?: string;
 }
 
 export interface KpiQueryVariables {

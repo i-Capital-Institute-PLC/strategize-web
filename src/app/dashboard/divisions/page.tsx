@@ -149,6 +149,7 @@ const DivisionsPage = () => {
         }
       ),
       managedBy: graphqlDivision.head?.fullName || "No Manager",
+      headEmployeeId: graphqlDivision.head?.employeeId || null,
       departments: graphqlDivision.departments?.length || 0,
     }));
   }, [divisionsData, filterType]);
@@ -397,7 +398,7 @@ const DivisionsPage = () => {
               onEditSuccess={() => {
                 refetchDivisions();
               }}
-              readOnly={!canAccessEmployees}
+              readOnly={!(guards.isAdmin || guards.isSuperAdmin || guards.isDirector)}
             />
           </div>
 

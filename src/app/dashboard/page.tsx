@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Users } from "lucide-react";
 import { useAuthStore, useStrategicPeriodStore } from "@/stores";
 import AnalyticsSummary from "@/components/dashboard/AnalyticsSummary";
+import EmployeeLifecycleBanner from "@/components/dashboard/EmployeeLifecycleBanner";
 
 import { OrganizationalHealthCard } from "@/components/dashboard/OrganizationalHealthCard";
 import { DepartmentHeatMap } from "@/components/dashboard/DepartmentHeatMap";
@@ -139,6 +140,7 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-7 pb-8">
+      <EmployeeLifecycleBanner />
       <AnalyticsSummary />
 
       {/* Approved, server-scoped quarterly performance is the dashboard authority. */}

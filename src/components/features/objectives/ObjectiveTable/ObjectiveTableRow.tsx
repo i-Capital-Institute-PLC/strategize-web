@@ -68,7 +68,14 @@ const ObjectiveTableRow: React.FC<ObjectiveTableRowProps> = ({
         boxShadow: isDragging ? "0 4px 12px rgba(0, 0, 0, 0.15)" : undefined,
     };
 
-    const objectiveKPIs = kpis.filter(k => k.objective?.objectiveId === objective.objectiveId);
+    const objectiveKPIs =
+        objective.kpis && objective.kpis.length > 0
+            ? (objective.kpis as Kpi[])
+            : kpis.filter(
+                (k) =>
+                    k.objective?.objectiveId === objective.objectiveId ||
+                    (k as any).strategicObjectiveId === objective.objectiveId,
+            );
     const totalWeight = objectiveKPIs.reduce((sum, kpi) => sum + (kpi.weight || 0), 0);
     const approvedKPIs = objectiveKPIs.filter(k => k.status === "APPROVED").length;
 

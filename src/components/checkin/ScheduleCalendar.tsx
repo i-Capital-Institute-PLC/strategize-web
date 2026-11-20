@@ -294,7 +294,7 @@ export function ScheduleCalendar({
                                                 Edit
                                               </Button>
                                             )}
-                                            {isSuperAdmin &&
+                                            {canGenerateSchedule &&
                                               week.status === "DRAFT" &&
                                               view === "current" && (
                                                 <Button

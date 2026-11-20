@@ -13,6 +13,8 @@ import {
   ArrowRight,
   Info,
   Sparkles,
+  History,
+  Building2,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@apollo/client";
@@ -20,6 +22,8 @@ import { GET_REALTIME_INDIVIDUAL_SCORECARD } from "@/lib/graphql/queries/kpi-sco
 import { GET_KPI_ASSIGNMENTS_EMPLOYEE } from "@/lib/graphql/queries/kpis";
 import { GET_EMPLOYEES } from "@/lib/graphql/queries/employees";
 import { GET_STRATEGIC_PERIODS } from "@/lib/graphql/queries/strategicPeriods";
+import { GET_DEPARTMENTS } from "@/lib/graphql/queries/departments";
+import EmployeeLifecycleBanner from "@/components/dashboard/EmployeeLifecycleBanner";
 import {
   Select,
   SelectContent,
@@ -222,6 +226,56 @@ export default function IndividualScorecard({
       columns: scorecardColumns,
     });
 
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>("ALL");
+
+  const orgId = user?.organizationId;
+  const { data: deptsData } = useQuery(GET_DEPARTMENTS, {
+    variables: { organizationId: orgId, page: 1, limit: 100 },
+    skip: !orgId,
+  });
+  const departments = deptsData?.departments?.items || [];
+  const deptMap = useMemo(() => {
+    const map = new Map<string, string>();
+    departments.forEach((d: any) => map.set(d.departmentId, d.name));
+    return map;
+  }, [departments]);
+
+  const selectedEmp = employees.find((e: any) => e.employeeId === selectedEmployeeId) || user;
+  const activeDeptId = (selectedEmp as any)?.departments?.[0]?.departmentId || (user as any)?.departments?.[0]?.departmentId;
+  const activeDeptName = (selectedEmp as any)?.departments?.[0]?.name || (user as any)?.departments?.[0]?.name;
+
+  const getKpiDeptInfo = (kpiId: string) => {
+    const assignment = assignmentMap.get(kpiId) as any;
+    const parentDeptId = assignment?.kpi?.parent?.assigneeId;
+    if (parentDeptId && deptMap.has(parentDeptId)) {
+      const name = deptMap.get(parentDeptId)!;
+      const isActive = parentDeptId === activeDeptId;
+      return { id: parentDeptId, name, isActive };
+    }
+    return null;
+  };
+
+  const distinctDepts = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number; isActive: boolean }>();
+    kpiScoreRows.forEach((row) => {
+      const info = getKpiDeptInfo(row.kpi.kpiId);
+      if (info) {
+        const existing = map.get(info.id) || { id: info.id, name: info.name, count: 0, isActive: info.isActive };
+        existing.count += 1;
+        map.set(info.id, existing);
+      }
+    });
+    return Array.from(map.values());
+  }, [kpiScoreRows, assignmentMap, deptMap, activeDeptId]);
+
+  const displayedRows = useMemo(() => {
+    if (selectedDeptFilter === "ALL") return kpiScoreRows;
+    return kpiScoreRows.filter((row) => {
+      const info = getKpiDeptInfo(row.kpi.kpiId);
+      return info?.id === selectedDeptFilter;
+    });
+  }, [kpiScoreRows, selectedDeptFilter, assignmentMap, deptMap, activeDeptId]);
+
   const getAchievementColor = (rate: number | null | undefined): string => {
     if (rate === null || rate === undefined || isNaN(Number(rate))) return "text-muted-foreground";
     const val = Number(rate);
@@ -275,6 +329,7 @@ export default function IndividualScorecard({
 
   return (
     <div className="space-y-6">
+      <EmployeeLifecycleBanner />
       {/* Header with Simulator Toggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -506,14 +561,69 @@ export default function IndividualScorecard({
           {/* KPI Details Table */}
           <Card>
             <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle>KPI Performance Details</CardTitle>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>KPI Performance Details</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Authoritative quarterly targets, actuals, and pacing indicators
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {distinctDepts.length > 1 && (
+                    <div className="flex items-center rounded-xl bg-slate-100 p-1 dark:bg-zinc-800 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDeptFilter("ALL")}
+                        className={cn(
+                          "rounded-lg px-2.5 py-1 font-medium transition-colors",
+                          selectedDeptFilter === "ALL"
+                            ? "bg-white text-slate-900 shadow-2xs dark:bg-zinc-900 dark:text-zinc-100"
+                            : "text-slate-600 hover:text-slate-900 dark:text-zinc-400",
+                        )}
+                      >
+                        All KPIs ({kpiScoreRows.length})
+                      </button>
+                      {distinctDepts.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => setSelectedDeptFilter(d.id)}
+                          className={cn(
+                            "rounded-lg px-2.5 py-1 font-medium transition-colors flex items-center gap-1.5",
+                            selectedDeptFilter === d.id
+                              ? "bg-white text-slate-900 shadow-2xs dark:bg-zinc-900 dark:text-zinc-100"
+                              : "text-slate-600 hover:text-slate-900 dark:text-zinc-400",
+                          )}
+                        >
+                          <span>{d.name}</span>
+                          <span
+                            className={cn(
+                              "text-[10px] px-1.5 py-0.2 rounded-full font-semibold",
+                              d.isActive
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                : "bg-slate-200 text-slate-700 dark:bg-zinc-700 dark:text-zinc-300",
+                            )}
+                          >
+                            {d.isActive ? "Active" : "Archived"} ({d.count})
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <Badge variant="outline" className="text-xs font-mono">
                     Active Quarter: Q{currentQuarterNumber}
                   </Badge>
                 </div>
               </div>
+              {selectedDeptFilter !== "ALL" &&
+                distinctDepts.find((d) => d.id === selectedDeptFilter && !d.isActive) && (
+                  <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200 flex items-center gap-2">
+                    <History className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <span>
+                      <strong>Archived Department Performance:</strong> Delivered Q1 achievements and evaluations from this department are safely preserved and credited. Unworked Q2–Q4 quotas were reallocated to the department holding pool.
+                    </span>
+                  </div>
+                )}
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
@@ -602,7 +712,7 @@ export default function IndividualScorecard({
                     </tr>
                   </thead>
                   <tbody>
-                    {kpiScoreRows.map((kpiScore) => {
+                    {displayedRows.map((kpiScore) => {
                       const achievementPercent = kpiScore.achievementRate * 100;
                       const assignment = assignmentMap.get(kpiScore.kpi.kpiId);
                       const hasParentWeight = Boolean(
@@ -638,6 +748,23 @@ export default function IndividualScorecard({
                             <div>
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <p className="font-medium">{kpiScore.kpi.name}</p>
+                                {(() => {
+                                  const deptInfo = getKpiDeptInfo(kpiScore.kpi.kpiId);
+                                  if (!deptInfo) return null;
+                                  return (
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px] px-1.5 py-0 font-medium",
+                                        deptInfo.isActive
+                                          ? "border-emerald-300 text-emerald-700 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/50"
+                                          : "border-slate-300 text-slate-600 bg-slate-50 dark:border-zinc-700 dark:text-zinc-400 dark:bg-zinc-800/50",
+                                      )}
+                                    >
+                                      {deptInfo.name} {deptInfo.isActive ? "(Active)" : "(Archived Q1)"}
+                                    </Badge>
+                                  );
+                                })()}
                                 {isRowAtRisk && (
                                   <Badge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 border-red-300 text-[10px] px-1.5 py-0 font-bold">
                                     🚨 At-Risk

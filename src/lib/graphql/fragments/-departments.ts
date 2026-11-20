@@ -27,6 +27,8 @@ export const DepartmentsFragment = gql`
       fullName
       email
       role
+      title
+      status
     }
   }
 `;

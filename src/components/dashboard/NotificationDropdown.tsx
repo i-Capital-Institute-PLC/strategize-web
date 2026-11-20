@@ -17,6 +17,8 @@ import {
   UserCheck,
   Timer,
   Lock,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useQuery, useMutation } from "@apollo/client";
 import { GET_NOTIFICATIONS } from "@/lib/graphql/queries/notifications";
@@ -25,6 +27,10 @@ import {
   REMOVE_NOTIFICATION,
   MARK_ALL_NOTIFICATIONS_READ,
 } from "@/lib/graphql/mutations/notifications";
+import {
+  APPROVE_DEPARTURE_CLEARANCE,
+  REJECT_DEPARTURE_CLEARANCE,
+} from "@/lib/graphql/mutations/target-rebalancing";
 import { usePendingApprovalsBadge } from "@/providers/PendingApprovalsProvider";
 import { useAuthContext } from "@/providers/AuthProvider";
 import { formatDistanceToNow } from "date-fns";
@@ -136,6 +142,56 @@ export default function NotificationDropdown() {
     user?.role === "SUPER_ADMIN" ||
     user?.role === "COORDINATOR";
 
+  const isHrOrAdmin = useMemo(() => {
+    if (!user) return false;
+    const email = (user.email || "").toLowerCase();
+    const title = (user.title || "").toLowerCase();
+    const role = (user.role || "").toUpperCase();
+    return (
+      email.includes("kaleb") ||
+      email.includes("hr") ||
+      title.includes("hr") ||
+      title.includes("human resource") ||
+      role === "ADMIN" ||
+      role === "SUPER_ADMIN"
+    );
+  }, [user]);
+
+  // Helper: check if notification is an approval/rejection outcome update (not an actionable request)
+  const isResultNotification = (n: any) => {
+    const type = (n?.notificationType || "").toUpperCase();
+    const title = (n?.title || "").toLowerCase();
+    const text = `${n?.title || ""} ${n?.message || ""}`.toLowerCase();
+    return (
+      type === "APPROVAL_RESULT" ||
+      type.includes("RESULT") ||
+      title.includes("approved") ||
+      title.includes("rejected") ||
+      title.includes("clearance approved") ||
+      title.includes("clearance rejected") ||
+      text.includes("approved departure clearance") ||
+      text.includes("rejected departure clearance")
+    );
+  };
+
+  // Helper: check if an approver can act on this notification right now
+  const isActionablePendingRequest = (n: any) => {
+    if (isResultNotification(n)) return false;
+    if (resolvedActions[n.notificationId]) return false;
+    if (n.status === "READ") return false;
+
+    const isDepartureClearance =
+      n.relatedEntityType === "DepartureClearanceRequest" ||
+      (n.title || "").toLowerCase().includes("departure clearance") ||
+      (n.title || "").toLowerCase().includes("transfer request");
+
+    if (isDepartureClearance) {
+      return isHrOrAdmin;
+    }
+
+    return isApprover;
+  };
+
   // Polling every 10 minutes (600,000 ms) as specified by leadership
   const { data, loading, refetch } = useQuery(GET_NOTIFICATIONS, {
     variables: {
@@ -157,6 +213,8 @@ export default function NotificationDropdown() {
   const [updateNotification] = useMutation(UPDATE_NOTIFICATION);
   const [removeNotification] = useMutation(REMOVE_NOTIFICATION);
   const [markAllReadMutation] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
+  const [approveDeparture] = useMutation(APPROVE_DEPARTURE_CLEARANCE);
+  const [rejectDeparture] = useMutation(REJECT_DEPARTURE_CLEARANCE);
 
   const rawNotifications = useMemo(() => {
     return (data?.notifications?.items || []).filter(
@@ -319,12 +377,73 @@ export default function NotificationDropdown() {
     }
   };
 
-  const handleInlineAction = (
+  const handleInlineAction = async (
     notification: any,
     action: "APPROVE" | "REJECT",
     e: React.MouseEvent,
   ) => {
     e.stopPropagation();
+
+    // Check if this is a Departure Clearance Request
+    const isDepartureClearance =
+      notification.relatedEntityType === "DepartureClearanceRequest" ||
+      (notification.title || "").toLowerCase().includes("departure clearance") ||
+      (notification.title || "").toLowerCase().includes("transfer request");
+
+    if (isDepartureClearance && notification.relatedEntityId) {
+      try {
+        if (action === "APPROVE") {
+          const res = await approveDeparture({
+            variables: {
+              input: {
+                departureClearanceRequestId: notification.relatedEntityId,
+              },
+            },
+          });
+          if (res.data?.approveDepartureClearance?.success) {
+            toast.success(
+              res.data.approveDepartureClearance.message ||
+                "Departure clearance approved! Unachieved targets moved to Department Holding Pool.",
+            );
+          }
+        } else {
+          await rejectDeparture({
+            variables: {
+              input: {
+                departureClearanceRequestId: notification.relatedEntityId,
+                reason: "Rejected by HR via Notification Center",
+              },
+            },
+          });
+          toast.success("Departure clearance rejected.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Failed to process departure clearance.");
+        return;
+      }
+
+      setResolvedActions((prev) => ({
+        ...prev,
+        [notification.notificationId]: action,
+      }));
+      setReadOverrides((prev) => ({
+        ...prev,
+        [notification.notificationId]: true,
+      }));
+      void updateNotification({
+        variables: {
+          updateNotificationInput: {
+            notificationId: notification.notificationId,
+            status: "READ",
+            readAt: new Date().toISOString(),
+          },
+        },
+      });
+      void refetch();
+      setOpen(false);
+      return;
+    }
+
     setResolvedActions((prev) => ({
       ...prev,
       [notification.notificationId]: action,
@@ -377,6 +496,9 @@ export default function NotificationDropdown() {
       let url = "/dashboard";
 
       switch (entityType) {
+        case "departureclearancerequest":
+          url = "/dashboard/departments/7964f906-67d2-4972-a3d4-5ee68f14b87a";
+          break;
         case "objective":
           url = `/dashboard/objectives/${notification.relatedEntityId}`;
           break;
@@ -390,6 +512,7 @@ export default function NotificationDropdown() {
           url = `/dashboard/evaluations`;
           break;
         case "approval":
+        case "submission":
           url = `/dashboard/approvals`;
           break;
         case "logbook_entry":
@@ -656,7 +779,26 @@ export default function NotificationDropdown() {
                 "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300";
               let badgeLabel = "LOGBOOK ENTRY";
 
-              if (category === "requests") {
+              const isResult = isResultNotification(notification);
+
+              if (isResult) {
+                const isRejected =
+                  (notification.title || "").toLowerCase().includes("rejected") ||
+                  (notification.message || "").toLowerCase().includes("rejected");
+                if (isRejected) {
+                  iconNode = <XCircle className="w-4 h-4 text-white" />;
+                  iconContainerBg = "bg-rose-600";
+                  badgeBg =
+                    "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300";
+                  badgeLabel = "APPROVAL RESULT";
+                } else {
+                  iconNode = <CheckCircle2 className="w-4 h-4 text-white" />;
+                  iconContainerBg = "bg-emerald-600";
+                  badgeBg =
+                    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300";
+                  badgeLabel = "APPROVAL RESULT";
+                }
+              } else if (category === "requests") {
                 iconNode = <UserCheck className="w-4 h-4 text-white" />;
                 iconContainerBg = "bg-purple-600";
                 badgeBg =
@@ -768,6 +910,18 @@ export default function NotificationDropdown() {
                             ? "Approved by You"
                             : "Rejected by You"}
                         </span>
+                      ) : isResult ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(false);
+                            handleNotificationClick(notification);
+                          }}
+                          className="inline-flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          <span>View in Department Pool</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
                       ) : (
                         <>
                           {category === "logbook" && (
@@ -786,7 +940,7 @@ export default function NotificationDropdown() {
 
                           {category === "requests" && (
                             <>
-                              {isApprover ? (
+                              {isActionablePendingRequest(notification) ? (
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={(e) =>
@@ -819,13 +973,11 @@ export default function NotificationDropdown() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setOpen(false);
-                                    router.push(
-                                      "/dashboard/approvals/my-submissions",
-                                    );
+                                    handleNotificationClick(notification);
                                   }}
                                   className="inline-flex items-center gap-1 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
                                 >
-                                  <span>View Status</span>
+                                  <span>View Details</span>
                                   <ExternalLink className="w-3 h-3" />
                                 </button>
                               )}

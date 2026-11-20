@@ -23,6 +23,10 @@ export const LOGIN_EMPLOYEE = gql`
         picture
         isFirstLogin
         mustChangePassword
+        departments {
+          departmentId
+          name
+        }
       }
     }
   }
