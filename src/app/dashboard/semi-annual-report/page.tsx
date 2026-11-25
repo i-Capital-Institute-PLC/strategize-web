@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, gql } from "@apollo/client";
+import { GET_STRATEGIC_PERIODS } from "@/lib/graphql/queries/strategicPeriods";
 import {
   Card,
   CardContent,
@@ -61,29 +62,28 @@ export default function SemiAnnualReportPage() {
   const [employeeAssignments, setEmployeeAssignments] = useState<Record<string, Record<string, number>>>({});
   const [hasChanges, setHasChanges] = useState(false);
 
-  const fullAccessRoles = ["SUPER_ADMIN", "HR"];
+  const fullAccessRoles = ["SUPER_ADMIN", "HR", "SMEAL"];
   const hasFullAccess = fullAccessRoles.includes(user?.role as string);
 
-  // Fetch strategic periods
-  const { data: periodsData } = useQuery(gql`
-    query GetStrategicPeriods($organizationId: ID!) {
-      strategicPeriods(organizationId: $organizationId) {
-        items {
-          strategicPeriodId
-          name
-          periodType
-          startDate
-          endDate
-          status
-        }
-      }
-    }
-  `, {
-    variables: { organizationId: user?.organizationId },
+  // Fetch all strategic periods (high limit so 2026+ periods are never truncated)
+  const { data: periodsData } = useQuery(GET_STRATEGIC_PERIODS, {
+    variables: {
+      page: 1,
+      limit: 1000,
+      organizationId: user?.organizationId,
+    },
     skip: !user?.organizationId,
+    fetchPolicy: "cache-and-network",
   });
 
-  const periods = periodsData?.strategicPeriods?.items || [];
+  const periods = useMemo(() => {
+    const items = [...(periodsData?.strategicPeriods?.items || [])];
+    return items.sort((a: any, b: any) => {
+      if (a.status === "ACTIVE" && b.status !== "ACTIVE") return -1;
+      if (b.status === "ACTIVE" && a.status !== "ACTIVE") return 1;
+      return String(b.startDate || "").localeCompare(String(a.startDate || ""));
+    });
+  }, [periodsData]);
 
   // Auto-select first period
   useEffect(() => {

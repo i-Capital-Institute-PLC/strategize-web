@@ -102,4 +102,41 @@ describe("canSubmitWeeklyTasks", () => {
       "task-9",
     ]);
   });
+
+  it("keeps a fresh KPI_FULFILLED task even when a carried-over task is also KPI_FULFILLED", () => {
+    const ordinaryDrafts = Array.from({ length: 10 }, (_, index) => ({
+      id: `task-${index + 1}`,
+      submissionStatus: "DRAFT",
+      taskType: "KPI_UNMET",
+    }));
+
+    expect(
+      getBulkDraftTaskIds([
+        ...ordinaryDrafts,
+        {
+          id: "carryover-fulfilled",
+          submissionStatus: "DRAFT",
+          taskType: "KPI_FULFILLED",
+          carryoverGeneration: 1,
+        },
+        {
+          id: "fresh-fulfilled",
+          submissionStatus: "DRAFT",
+          taskType: "KPI_FULFILLED",
+          carryoverGeneration: 0,
+        },
+      ]),
+    ).toEqual([
+      "carryover-fulfilled",
+      "task-1",
+      "task-2",
+      "task-3",
+      "task-4",
+      "task-5",
+      "task-6",
+      "task-7",
+      "task-8",
+      "fresh-fulfilled",
+    ]);
+  });
 });

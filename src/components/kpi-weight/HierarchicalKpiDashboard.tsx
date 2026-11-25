@@ -105,7 +105,7 @@ export function HierarchicalKpiDashboard({ periodId }: HierarchicalKpiDashboardP
     const role = currentUser.role;
     const organizationId = currentUser.organizationId;
 
-    if (role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'CEO') {
+    if (role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'SMEAL' || role === 'CEO' || role === 'DCEO') {
       setInitialContext({
         level: 'CORPORATE',
         entityId: organizationId || '',
@@ -140,7 +140,7 @@ export function HierarchicalKpiDashboard({ periodId }: HierarchicalKpiDashboardP
         });
         return;
       }
-      
+
       // Otherwise check departments where they are head
       if (userDepartmentsData?.departments?.items) {
         const userDepartments = userDepartmentsData.departments.items.filter(
@@ -158,13 +158,13 @@ export function HierarchicalKpiDashboard({ periodId }: HierarchicalKpiDashboardP
     }
   }, [currentUser, userDivisionsData, userDepartmentsData]);
 
-  const currentLevel = navigationStack.length > 0 
-    ? navigationStack[navigationStack.length - 1] 
+  const currentLevel = navigationStack.length > 0
+    ? navigationStack[navigationStack.length - 1]
     : (initialContext ? {
-        level: initialContext.level,
-        entityId: initialContext.entityId,
-        entityName: '',
-      } : null);
+      level: initialContext.level,
+      entityId: initialContext.entityId,
+      entityName: '',
+    } : null);
 
   // Fetch data based on current level
   const {
@@ -225,7 +225,7 @@ export function HierarchicalKpiDashboard({ periodId }: HierarchicalKpiDashboardP
 
   const handleUnitChange = (unitId: string) => {
     setSelectedUnitId(unitId);
-    
+
     // Determine the level based on initial context
     if (initialContext?.level === 'CORPORATE') {
       // Admin selecting a division
@@ -339,7 +339,7 @@ export function HierarchicalKpiDashboard({ periodId }: HierarchicalKpiDashboardP
                       {index === navigationStack.length - 1 ? (
                         <BreadcrumbPage>{level.entityName}</BreadcrumbPage>
                       ) : (
-                        <BreadcrumbLink 
+                        <BreadcrumbLink
                           onClick={() => handleBreadcrumbClick(index)}
                           className="cursor-pointer"
                         >
@@ -438,13 +438,13 @@ export function HierarchicalKpiDashboard({ periodId }: HierarchicalKpiDashboardP
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Achievement Rate</CardTitle>
-                <Badge 
+                <Badge
                   variant={
-                    parseFloat(String(currentData.achievementPercentage)) >= 100 
-                      ? 'default' 
-                      : parseFloat(String(currentData.achievementPercentage)) >= 80 
-                      ? 'secondary' 
-                      : 'destructive'
+                    parseFloat(String(currentData.achievementPercentage)) >= 100
+                      ? 'default'
+                      : parseFloat(String(currentData.achievementPercentage)) >= 80
+                        ? 'secondary'
+                        : 'destructive'
                   }
                   className="text-base"
                 >

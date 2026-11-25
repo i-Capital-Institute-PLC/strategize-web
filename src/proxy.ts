@@ -22,6 +22,7 @@ const PUBLIC_ROUTES = [
 
 // Routes that require specific roles
 const ROLE_BASED_ROUTES: Record<string, string[]> = {
+  '/dashboard/admin/kpi-formulas': ['SMEAL', 'ADMIN', 'SUPER_ADMIN'],
   '/dashboard/admin': ['ADMIN', 'SUPER_ADMIN'],
   // More specific path first (startsWith loop order follows insertion)
   '/dashboard/approvals/my-submissions': ['MANAGER', 'DIRECTOR'],

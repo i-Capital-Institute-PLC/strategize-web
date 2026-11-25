@@ -62,10 +62,10 @@ export default function SessionListView({
     CheckinoutSessionLike[]
   >([]);
 
-  const isManager = ["MANAGER", "DIRECTOR", "ADMIN", "SUPER_ADMIN"].includes(
+  const isManager = ["MANAGER", "DIRECTOR", "ADMIN", "SMEAL", "SUPER_ADMIN"].includes(
     currentUser?.role,
   );
-  const isAdminOrHR = ["ADMIN", "SUPER_ADMIN", "HR"].includes(
+  const isAdminOrHR = ["ADMIN", "SMEAL", "SUPER_ADMIN", "HR"].includes(
     currentUser?.role,
   );
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";

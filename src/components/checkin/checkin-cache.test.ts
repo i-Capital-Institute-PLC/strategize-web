@@ -46,6 +46,8 @@ const task = (id: string, sessionId: string, title = id) => ({
   carryoverGeneration: 0,
   isCarryoverOverdue: false,
   carryoverEscalatedAt: null,
+  isApprovalOverdue: false,
+  approvalEscalatedAt: null,
   createdAt: "2026-08-24T06:00:00.000Z",
   updatedAt: "2026-08-24T06:00:00.000Z",
   approvedBy: null,

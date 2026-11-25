@@ -94,7 +94,7 @@ export default function AdvancedKPIDashboard() {
   const user = useAuthStore((state) => state.user);
   const { selectedPeriod } = useStrategicPeriodStore();
 
-  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "HR", "CEO"]);
+  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO"]);
   const hasFullAccess = !!user?.role && fullAccessRoles.has(user.role as string);
   
   const managerRoles = new Set(["MANAGER", "DIRECTOR"]);

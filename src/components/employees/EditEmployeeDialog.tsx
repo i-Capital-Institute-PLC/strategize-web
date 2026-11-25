@@ -29,6 +29,8 @@ import {
   Employee,
 } from "@/types/graphql";
 import { useRoles } from "@/hooks/permissions/usePermissionManagement";
+import { useAuthStore } from "@/stores";
+import { getAssignableRoles } from "@/lib/rbac";
 import { ReportingManagerSelect } from './ReportingManagerSelect';
 
 interface EditEmployeeDialogProps {
@@ -90,6 +92,8 @@ const EditEmployeeDialog: React.FC<EditEmployeeDialogProps> = ({
 
   const { updateEmployee, updateLoading } = useEmployeeMutations();
   const { roles, loading: rolesLoading } = useRoles(1, 100); // Fetch all active roles
+  const currentUser = useAuthStore((state) => state.user);
+  const assignableRoles = React.useMemo(() => getAssignableRoles(currentUser?.role), [currentUser?.role]);
 
   // Initialize form data when employee prop changes or dialog opens
   useEffect(() => {
@@ -395,7 +399,7 @@ const EditEmployeeDialog: React.FC<EditEmployeeDialogProps> = ({
                     <SelectItem value="empty" disabled>No roles available</SelectItem>
                   ) : (
                     roles
-                      .filter((role: any) => !role.isDeleted) // Only show active roles
+                      .filter((role: any) => !role.isDeleted && (assignableRoles.length === 0 || assignableRoles.includes(role.code as EmployeeRole))) // Only show roles the user can assign
                       .map((role: any) => (
                         <SelectItem key={role.roleId} value={role.code}>
                           <div className="flex flex-col">

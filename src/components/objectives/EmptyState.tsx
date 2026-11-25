@@ -5,8 +5,11 @@ import { useAuthStore } from "@/stores";
 export default function EmptyState() {
   const user = useAuthStore((state) => state.user);
 
-  // Only show Add Objective button for admin and super admin users
-  const showAddButton = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  // Show Add Objective button for admin, super admin, and SMEAL users
+  const showAddButton =
+    user?.role === "ADMIN" ||
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "SMEAL";
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
       <Image

@@ -14,7 +14,7 @@ import CascadeMappingManager from "./CascadeMappingManager";
 import { useAuthStore, useOrgUnitStore } from "@/stores";
 
 function defaultScorecardTab(role?: string) {
-  if (role === "CEO") return "corporate";
+  if (role === "CEO" || role === "DCEO") return "corporate";
   if (role === "DIRECTOR") return "division";
   if (role === "MANAGER") return "department";
   return "individual";
@@ -24,7 +24,7 @@ export default function KpiScorecardDashboard() {
   const { can } = usePermissions();
   const role = useAuthStore((state) => state.user?.role);
   const selectedUnit = useOrgUnitStore((state) => state.selectedUnit);
-  const canManageKpis = role !== 'CEO'; // Preserve existing roles; CEO is an observer.
+  const canManageKpis = role !== 'CEO' && role !== 'DCEO'; // Preserve existing roles; CEO/DCEO are observers.
   const canReadAll = can("evaluations:read_all");
   const isOwnDepartmentScope =
     role === "MANAGER" && selectedUnit?.type === "department";

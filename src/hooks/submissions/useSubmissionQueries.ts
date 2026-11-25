@@ -23,6 +23,8 @@ import {
 interface UseSubmissionQueriesOptions {
   shouldFetch: boolean;
   approverRole: ApproverRole;
+  /** Whether the active approver is DCEO (adds CEO-Office direct personnel scope). */
+  isDceo?: boolean;
   /** When false, returns all statuses (for "my submissions" tracking). Default true. */
   pendingOnly?: boolean;
   /** Page size. Defaults to 1000 for approval tables. */
@@ -101,15 +103,16 @@ function useLevelSubmissionQuery(
 export const useSubmissionQueries = ({
   shouldFetch,
   approverRole,
+  isDceo = false,
   pendingOnly = true,
   limit = DEFAULT_LIMIT,
 }: UseSubmissionQueriesOptions): SubmissionQueriesResult => {
   const enabledLevels = useMemo(
     () =>
       pendingOnly
-        ? inboundLevelsForApprover(approverRole)
+        ? inboundLevelsForApprover(approverRole, isDceo)
         : outboundLevelsForTracking(),
-    [approverRole, pendingOnly],
+    [approverRole, isDceo, pendingOnly],
   );
 
   const corporateObj = useLevelSubmissionQuery(

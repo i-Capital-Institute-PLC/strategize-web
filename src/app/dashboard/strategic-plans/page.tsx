@@ -53,8 +53,11 @@ export default function StrategicPlansPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   
-  // Role-based access: SUPER_ADMIN and ADMIN (CEO) can edit/archive/activate
-  const canEdit = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+  // Role-based access: SUPER_ADMIN, ADMIN, and SMEAL can edit/archive/activate
+  const canEdit =
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "ADMIN" ||
+    user?.role === "SMEAL";
   const canView = true; // Everyone can view
 
   const [createOpen, setCreateOpen] = useState(false);

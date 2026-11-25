@@ -861,10 +861,14 @@ export type Employee = {
 
 export enum EmployeeRole {
   Admin = 'ADMIN',
+  Ceo = 'CEO',
   Coordinator = 'COORDINATOR',
+  Dceo = 'DCEO',
   Director = 'DIRECTOR',
+  Hr = 'HR',
   Manager = 'MANAGER',
   Normal = 'NORMAL',
+  Smeal = 'SMEAL',
   SuperAdmin = 'SUPER_ADMIN'
 }
 

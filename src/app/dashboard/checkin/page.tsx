@@ -57,6 +57,7 @@ import {
   Target,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   TrendingUp,
   Calendar,
 } from "lucide-react";
@@ -114,6 +115,8 @@ const mapTaskToFrontend = (task: any) => ({
   carryoverGeneration: task.carryoverGeneration ?? 0,
   isCarryoverOverdue: Boolean(task.isCarryoverOverdue),
   carryoverEscalatedAt: task.carryoverEscalatedAt || null,
+  isApprovalOverdue: Boolean(task.isApprovalOverdue),
+  approvalEscalatedAt: task.approvalEscalatedAt || null,
 });
 
 function EmployeeTaskCard({
@@ -300,6 +303,21 @@ function EmployeeTaskCard({
             >
               {session.overallStatus}
             </Badge>
+            {tasks.some(
+              (t: any) =>
+                t.isApprovalOverdue || Boolean(t.approvalEscalatedAt),
+            ) && (
+              <Badge className="gap-1 bg-red-600 text-[10px] font-semibold text-white">
+                <AlertTriangle className="h-3 w-3" />
+                {
+                  tasks.filter(
+                    (t: any) =>
+                      t.isApprovalOverdue || Boolean(t.approvalEscalatedAt),
+                  ).length
+                }{" "}
+                Unapproved 2+ wks
+              </Badge>
+            )}
           </div>
 
           <div
@@ -1016,6 +1034,25 @@ export default function CheckInPage() {
       ).length,
     [tasks, validSelectedTaskIds],
   );
+  const selectedNewKpiFulfilledCount = useMemo(
+    () =>
+      tasks.filter(
+        (task: any) =>
+          validSelectedTaskIds.has(task.id) &&
+          task.taskType === "KPI_FULFILLED" &&
+          (task.carryoverGeneration ?? 0) === 0,
+      ).length,
+    [tasks, validSelectedTaskIds],
+  );
+  const carriedOverKpiFulfilledCount = useMemo(
+    () =>
+      eligibleDraftTasks.filter(
+        (task: any) =>
+          task.taskType === "KPI_FULFILLED" &&
+          (task.carryoverGeneration ?? 0) > 0,
+      ).length,
+    [eligibleDraftTasks],
+  );
 
   const handleTaskSelectionChange = (taskId: string, selected: boolean) => {
     if (alreadySubmitted || sessionReadOnly) return;
@@ -1579,11 +1616,64 @@ export default function CheckInPage() {
             </div>
           </div>
 
+          {!isManagerMode &&
+            (currentWeekDataWithTasks?.tasks || []).some(
+              (task: any) =>
+                task.taskType === "KPI_FULFILLED" &&
+                (task.isApprovalOverdue || Boolean(task.approvalEscalatedAt)),
+            ) && (
+              <div
+                role="alert"
+                className="mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-900 shadow-sm dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-100"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <p className="text-sm font-semibold">
+                      Flagged KPI Fulfilled Tasks: Awaiting Immediate Manager
+                      Approval for 2+ Weeks
+                    </p>
+                    <p className="text-xs text-red-800 dark:text-red-200">
+                      The following KPI Fulfilled tasks remain{" "}
+                      <strong>Done Pending</strong> for two weeks or longer
+                      without immediate manager approval:
+                    </p>
+                    <ul className="list-disc space-y-1 pl-4 text-xs">
+                      {(currentWeekDataWithTasks?.tasks || [])
+                        .filter(
+                          (task: any) =>
+                            task.taskType === "KPI_FULFILLED" &&
+                            (task.isApprovalOverdue ||
+                              Boolean(task.approvalEscalatedAt)),
+                        )
+                        .map((flaggedTask: any) => (
+                          <li key={flaggedTask.id}>
+                            <span className="font-semibold">
+                              {flaggedTask.task}
+                            </span>
+                            {flaggedTask.linkedKpiName
+                              ? ` (${flaggedTask.linkedKpiName})`
+                              : ""}
+                            {flaggedTask.approvalEscalatedAt
+                              ? ` — flagged ${new Date(
+                                  flaggedTask.approvalEscalatedAt,
+                                ).toLocaleDateString()}`
+                              : ""}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
           {!isManagerMode && (
             <WeeklySubmissionPanel
               summary={poolSummary}
               selectedCount={validSelectedTaskIds.size}
               selectedKpiFulfilledCount={selectedKpiFulfilledCount}
+              selectedNewKpiFulfilledCount={selectedNewKpiFulfilledCount}
+              carriedOverKpiFulfilledCount={carriedOverKpiFulfilledCount}
               draftTaskCount={eligibleDraftTasks.length}
               bulkSelectableCount={bulkDraftTaskIds.length}
               requiredCarryoverCount={requiredCarryoverTaskIds.length}

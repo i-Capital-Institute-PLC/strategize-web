@@ -87,6 +87,9 @@ export interface UsePermissionsResult {
     isCoordinator: boolean;
     isManager: boolean;
     isDirector: boolean;
+    isHR: boolean;
+    isSMEAL: boolean;
+    isDCEO: boolean;
     isAdmin: boolean;
     isSuperAdmin: boolean;
     isCorporateAdmin: boolean;
@@ -213,6 +216,9 @@ export function usePermissions(): UsePermissionsResult {
       isCoordinator: role === "COORDINATOR",
       isManager: role === "MANAGER",
       isDirector: role === "DIRECTOR",
+      isHR: role === "HR",
+      isSMEAL: role === "SMEAL",
+      isDCEO: role === "DCEO",
       isAdmin: role === "ADMIN",
       isSuperAdmin: isSuperAdmin(role),
       isCorporateAdmin: isCorporateAdmin(role),

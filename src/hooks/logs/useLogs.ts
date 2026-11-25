@@ -26,6 +26,10 @@ export interface AuditLog {
   action: string; // AuditAction enum
   entityType?: string;
   entityId?: string;
+  entityLabel?: string;
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
   ipAddress?: string;
   userAgent?: string;
   createdAt: string;
@@ -57,6 +61,7 @@ interface AuditLogsQueryVariables {
   userId?: string;
   entityType?: string;
   organizationId?: string;
+  search?: string;
 }
 
 export const useActivityLogs = (variables: ActivityLogsQueryVariables = {}) => {

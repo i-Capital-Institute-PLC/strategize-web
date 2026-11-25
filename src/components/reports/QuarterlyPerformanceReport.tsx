@@ -70,9 +70,12 @@ interface ReportFilters {
   quarter: string;
   divisionId: string;
   departmentId: string;
+  unitId: string;
   employeeId: string;
   level: string;
   kpiMode: string;
+  kpiCategory: string;
+  selectedKpiIds: string[];
   planStatus: string;
   resultStatus: string;
   search: string;
@@ -82,9 +85,12 @@ const EMPTY_FILTERS: ReportFilters = {
   quarter: ALL,
   divisionId: ALL,
   departmentId: ALL,
+  unitId: ALL,
   employeeId: ALL,
   level: ALL,
   kpiMode: ALL,
+  kpiCategory: ALL,
+  selectedKpiIds: [],
   planStatus: ALL,
   resultStatus: ALL,
   search: "",
@@ -114,11 +120,18 @@ export default function QuarterlyPerformanceReport() {
         divisionId: filters.divisionId === ALL ? undefined : filters.divisionId,
         departmentId:
           filters.departmentId === ALL ? undefined : filters.departmentId,
+        unitId: filters.unitId === ALL ? undefined : filters.unitId,
         employeeId: filters.employeeId === ALL ? undefined : filters.employeeId,
         level:
           filters.level === ALL ? undefined : (filters.level as ScorecardLevel),
         kpiMode:
           filters.kpiMode === ALL ? undefined : (filters.kpiMode as KpiMode),
+        kpiCategory:
+          filters.kpiCategory === ALL ? undefined : filters.kpiCategory,
+        kpiIds:
+          filters.selectedKpiIds.length > 0
+            ? filters.selectedKpiIds
+            : undefined,
         planStatus:
           filters.planStatus === ALL
             ? undefined
@@ -278,6 +291,26 @@ export default function QuarterlyPerformanceReport() {
         !!department.parentId && selectedDivisionIds.has(department.parentId),
     );
   }, [available, selectedDivisionIds]);
+  const units = useMemo(() => {
+    const allUnits = available?.units ?? [];
+    if (!allUnits.length) return [];
+    if (filters.departmentId !== ALL) {
+      return allUnits.filter(
+        (unit) =>
+          unit.parentId === filters.departmentId ||
+          unit.parentIds.includes(filters.departmentId),
+      );
+    }
+    if (selectedDivisionIds) {
+      const departmentIds = new Set(departments.map((d) => d.id));
+      return allUnits.filter((unit) =>
+        unit.parentIds.some(
+          (id) => selectedDivisionIds.has(id) || departmentIds.has(id),
+        ),
+      );
+    }
+    return allUnits;
+  }, [available?.units, departments, filters.departmentId, selectedDivisionIds]);
   const employees = useMemo(() => {
     if (!available) return [];
     if (filters.departmentId !== ALL) {
@@ -302,6 +335,60 @@ export default function QuarterlyPerformanceReport() {
     return available.employees;
   }, [available, filters.departmentId, selectedDivisionIds]);
 
+  const kpiCatalogOptions = useMemo(() => {
+    const byId = new Map<string, { kpiId: string; kpiName: string; kpiCategory?: string | null }>();
+    for (const item of report?.kpiRollups ?? []) {
+      if (!byId.has(item.kpiId)) {
+        byId.set(item.kpiId, {
+          kpiId: item.kpiId,
+          kpiName: item.kpiName,
+          kpiCategory: item.kpiCategory,
+        });
+      }
+    }
+    return Array.from(byId.values());
+  }, [report?.kpiRollups]);
+
+  const categoryBreakdown = useMemo(() => {
+    const rollups = report?.kpiRollups ?? [];
+    const aggregate = (category: "FINANCIAL" | "NON_FINANCIAL") => {
+      const matching = rollups.filter(
+        (item) => (item.kpiCategory ?? "NON_FINANCIAL") === category,
+      );
+      const planned = matching.reduce(
+        (sum, item) => sum + item.plannedContributionWeight,
+        0,
+      );
+      const achieved = matching.reduce(
+        (sum, item) => sum + item.achievedContributionWeight,
+        0,
+      );
+      return {
+        kpiCount: matching.length,
+        plannedContributionWeight: planned,
+        achievedContributionWeight: achieved,
+        weightedAchievementRate: planned > 0 ? achieved / planned : 0,
+      };
+    };
+    return {
+      financial: aggregate("FINANCIAL"),
+      nonFinancial: aggregate("NON_FINANCIAL"),
+    };
+  }, [report?.kpiRollups]);
+
+  const toggleSelectedKpiId = (kpiId: string) => {
+    setFilters((current) => {
+      const exists = current.selectedKpiIds.includes(kpiId);
+      return {
+        ...current,
+        selectedKpiIds: exists
+          ? current.selectedKpiIds.filter((id) => id !== kpiId)
+          : [...current.selectedKpiIds, kpiId],
+      };
+    });
+    setPage(1);
+  };
+
   const updateFilter = <K extends keyof ReportFilters>(
     key: K,
     value: ReportFilters[K],
@@ -315,6 +402,7 @@ export default function QuarterlyPerformanceReport() {
       ...current,
       divisionId,
       departmentId: ALL,
+      unitId: ALL,
       employeeId: ALL,
     }));
     setPage(1);
@@ -324,6 +412,16 @@ export default function QuarterlyPerformanceReport() {
     setFilters((current) => ({
       ...current,
       departmentId,
+      unitId: ALL,
+      employeeId: ALL,
+    }));
+    setPage(1);
+  };
+
+  const handleUnitChange = (unitId: string) => {
+    setFilters((current) => ({
+      ...current,
+      unitId,
       employeeId: ALL,
     }));
     setPage(1);
@@ -359,6 +457,8 @@ export default function QuarterlyPerformanceReport() {
       department: row.departmentName ?? "",
       employee: row.employeeName ?? "",
       kpi: row.kpiName,
+      category: row.kpiCategory ?? "",
+      strategicPillar: row.strategicPillarName ?? "",
       mode: row.kpiMode,
       planStatus: row.planStatus,
       resultStatus: row.isNotDue ? "NOT_DUE" : row.resultStatus ?? "NOT_CALCULATED",
@@ -529,6 +629,19 @@ export default function QuarterlyPerformanceReport() {
               ]}
             />
           )}
+          {!!units.length && (
+            <FilterSelect
+              value={filters.unitId}
+              onChange={handleUnitChange}
+              placeholder="Unit"
+              options={[
+                [ALL, "All units"],
+                ...units.map(
+                  (unit) => [unit.id, unit.name] as [string, string],
+                ),
+              ]}
+            />
+          )}
           {!!employees.length && (
             <FilterSelect
               value={filters.employeeId}
@@ -543,6 +656,16 @@ export default function QuarterlyPerformanceReport() {
               ]}
             />
           )}
+          <FilterSelect
+            value={filters.kpiCategory}
+            onChange={(value) => updateFilter("kpiCategory", value)}
+            placeholder="KPI category"
+            options={[
+              [ALL, "All KPI categories"],
+              ["FINANCIAL", "Financial KPIs"],
+              ["NON_FINANCIAL", "Non-Financial KPIs"],
+            ]}
+          />
           <FilterSelect
             value={filters.kpiMode}
             onChange={(value) => updateFilter("kpiMode", value)}
@@ -578,6 +701,50 @@ export default function QuarterlyPerformanceReport() {
             ]}
           />
         </div>
+        {(kpiCatalogOptions.length > 0 || filters.selectedKpiIds.length > 0) && (
+          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-zinc-800">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Custom Summary KPI Selection
+                {filters.selectedKpiIds.length > 0 && (
+                  <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                    {filters.selectedKpiIds.length} selected
+                  </span>
+                )}
+              </p>
+              {filters.selectedKpiIds.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => updateFilter("selectedKpiIds", [])}
+                  className="h-7 px-2 text-xs text-slate-500"
+                >
+                  Clear KPI selection
+                </Button>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {kpiCatalogOptions.slice(0, 24).map((kpi) => {
+                const isPicked = filters.selectedKpiIds.includes(kpi.kpiId);
+                return (
+                  <button
+                    key={kpi.kpiId}
+                    type="button"
+                    onClick={() => toggleSelectedKpiId(kpi.kpiId)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      isPicked
+                        ? "border-indigo-500 bg-indigo-600 text-white"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300"
+                    }`}
+                  >
+                    {kpi.kpiName}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </Card>
 
       {loading && !report ? (
@@ -620,6 +787,44 @@ export default function QuarterlyPerformanceReport() {
               icon={<BarChart3 className="h-5 w-5" />}
               accent="#8b5cf6"
             />
+          </div>
+
+          {/* Financial vs Non-Financial Summary Split */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="rounded-2xl border border-emerald-200/70 bg-emerald-50/40 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                    Financial KPIs Summary
+                  </p>
+                  <p className="mt-1 text-xl font-extrabold text-slate-900 dark:text-zinc-100">
+                    {categoryBreakdown.financial.kpiCount} KPIs ·{" "}
+                    {formatPercent(categoryBreakdown.financial.weightedAchievementRate)}
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300">
+                  {formatNumber(categoryBreakdown.financial.achievedContributionWeight)} /{" "}
+                  {formatNumber(categoryBreakdown.financial.plannedContributionWeight)} pts
+                </Badge>
+              </div>
+            </Card>
+            <Card className="rounded-2xl border border-sky-200/70 bg-sky-50/40 p-4 dark:border-sky-900/40 dark:bg-sky-950/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
+                    Non-Financial KPIs Summary
+                  </p>
+                  <p className="mt-1 text-xl font-extrabold text-slate-900 dark:text-zinc-100">
+                    {categoryBreakdown.nonFinancial.kpiCount} KPIs ·{" "}
+                    {formatPercent(categoryBreakdown.nonFinancial.weightedAchievementRate)}
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-sky-300 bg-white text-sky-700 dark:border-sky-800 dark:bg-zinc-900 dark:text-sky-300">
+                  {formatNumber(categoryBreakdown.nonFinancial.achievedContributionWeight)} /{" "}
+                  {formatNumber(categoryBreakdown.nonFinancial.plannedContributionWeight)} pts
+                </Badge>
+              </div>
+            </Card>
           </div>
 
           {/* Contextual Metric Banner */}

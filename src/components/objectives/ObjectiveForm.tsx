@@ -49,10 +49,12 @@ export default function ObjectiveForm() {
     activeStrategicPlan?.strategicPlanId
   );
 
-  // Check if user is at corporate level (ADMIN or SUPER_ADMIN)
+  // Check if user is at corporate level (ADMIN, SUPER_ADMIN, or SMEAL)
   const isCorporateUser =
-    user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+    user?.role === "ADMIN" ||
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "SMEAL";
+  const isAdmin = isCorporateUser;
 
   const [selectedPillarId, setSelectedPillarId] = useState<string>("");
   const [objectiveName, setObjectiveName] = useState("");

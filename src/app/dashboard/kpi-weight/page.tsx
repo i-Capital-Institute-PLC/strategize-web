@@ -43,7 +43,9 @@ export default function KpiWeightPage() {
   const canViewHierarchical = 
     currentUser.role === 'SUPER_ADMIN' || 
     currentUser.role === 'CEO' ||
+    currentUser.role === 'DCEO' ||
     currentUser.role === 'ADMIN' || 
+    currentUser.role === 'SMEAL' ||
     currentUser.role === 'DIRECTOR' ||
     currentUser.role === 'MANAGER';
 

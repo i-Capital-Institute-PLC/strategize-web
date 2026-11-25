@@ -245,6 +245,28 @@ export const filterSubmissionsByListMode = (
   );
 };
 
+export const isSubmittedByCeoOfficeDirectReport = (
+  submission: MinimalSubmission,
+  currentUserId?: string | null,
+): boolean => {
+  const managerRole = submission.submittedBy?.manager?.role?.toUpperCase();
+  if (managerRole === "CEO" || managerRole === "DCEO") {
+    return true;
+  }
+  if (currentUserId && submission.submittedBy?.managerId === currentUserId) {
+    return true;
+  }
+  if (!submission.submittedBy?.managerId) {
+    return Boolean(
+      submission.submittedBy?.departments?.some((dept) => {
+        const headRole = dept.head?.role?.toUpperCase();
+        return headRole === "CEO" || headRole === "DCEO";
+      }),
+    );
+  }
+  return false;
+};
+
 /**
  * Filter submissions based on organizational hierarchy and approver role
  */
@@ -254,25 +276,38 @@ export const filterSubmissionsByHierarchy = (
   selectedUnitType: "division" | "department" | null,
   departmentsWithoutDivision: Set<string>,
   departmentsInSelectedDivision: Set<string> = new Set(),
-  selectedUnitId: string | null = null
+  selectedUnitId: string | null = null,
+  dceoOptions?: { isDceo?: boolean; currentUserId?: string | null },
 ): MinimalSubmission[] => {
   return submissions.filter((submission) => {
     switch (approverRole) {
       case "CORPORATE":
-        // Corporate (CEO/Super Admin) should ONLY see DIVISION level submissions
+        // Corporate (CEO/Super Admin/DCEO) handles DIVISION level submissions
         if (submission.level === "DIVISION") {
           return true;
         }
-        // For DEPARTMENT level, only show if the department has no division above it
-        // (orphaned departments that report directly to corporate)
+        // For DEPARTMENT level, show standalone departments (no division above)
+        // or CEO-Office direct reports for DCEO
         if (submission.level === "DEPARTMENT") {
           const deptId = getDepartmentIdFromSubmission(submission);
-          // If we can't determine the department, show it (safe default)
-          // If the department has no division, show it
-          return !deptId || departmentsWithoutDivision.has(deptId);
+          if (!deptId || departmentsWithoutDivision.has(deptId)) {
+            return true;
+          }
+          return Boolean(
+            dceoOptions?.isDceo &&
+              isSubmittedByCeoOfficeDirectReport(
+                submission,
+                dceoOptions.currentUserId,
+              ),
+          );
         }
-        // Do NOT show PERSONNEL level submissions to corporate
-        // Those should only be visible to department managers
+        // For PERSONNEL level, DCEO approves direct reports whose immediate manager is CEO Office
+        if (submission.level === "PERSONNEL" && dceoOptions?.isDceo) {
+          return isSubmittedByCeoOfficeDirectReport(
+            submission,
+            dceoOptions.currentUserId,
+          );
+        }
         return false;
 
       case "DIVISION":

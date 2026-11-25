@@ -97,6 +97,7 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const isOffboarded = user?.status === "DISABLED";
+  const isReadOnlyExecutive = user?.role === "CEO" || user?.role === "DCEO";
   const { deleteKpi, loading: mutLoading } = useKpiMutations();
   const selectedPeriod = useSelectedStrategicPeriod();
 
@@ -372,38 +373,42 @@ export default function KpisTable({ kpis, loading, organizationId }: KpisTablePr
                         >
                           <Eye className="mr-2 h-4 w-4" /> View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={isOffboarded}
-                          onClick={(e) => {
-                            if (isOffboarded) return;
-                            e.stopPropagation();
-                            setEditKpi(kpi);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            if (isOffboarded) return;
-                            e.stopPropagation();
-                            setAssignKpi(kpi);
-                          }}
-                          disabled={isOffboarded || !selectedPeriod || (kpi as any).kpiMode === "DIRECT"}
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          {(kpi as any).kpiMode === "DIRECT" ? "Assign (DIRECT mode)" : "Assign"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={isOffboarded}
-                          className="text-red-600"
-                          onClick={(e) => {
-                            if (isOffboarded) return;
-                            e.stopPropagation();
-                            setDeleteKpiItem(kpi);
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        {!isReadOnlyExecutive && (
+                          <>
+                            <DropdownMenuItem
+                              disabled={isOffboarded}
+                              onClick={(e) => {
+                                if (isOffboarded) return;
+                                e.stopPropagation();
+                                setEditKpi(kpi);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                if (isOffboarded) return;
+                                e.stopPropagation();
+                                setAssignKpi(kpi);
+                              }}
+                              disabled={isOffboarded || !selectedPeriod || (kpi as any).kpiMode === "DIRECT"}
+                            >
+                              <UserPlus className="mr-2 h-4 w-4" />
+                              {(kpi as any).kpiMode === "DIRECT" ? "Assign (DIRECT mode)" : "Assign"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={isOffboarded}
+                              className="text-red-600"
+                              onClick={(e) => {
+                                if (isOffboarded) return;
+                                e.stopPropagation();
+                                setDeleteKpiItem(kpi);
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableActions>

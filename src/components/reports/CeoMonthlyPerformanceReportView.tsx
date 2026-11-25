@@ -61,9 +61,12 @@ export default function CeoMonthlyPerformanceReportView() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  // Role verification (CEO and SUPER_ADMIN / Deputy CEO only)
+  // Role verification (CEO, DCEO, SMEAL, and SUPER_ADMIN only)
   const isAuthorized =
-    user?.role === "CEO" || user?.role === "SUPER_ADMIN";
+    user?.role === "CEO" ||
+    user?.role === "DCEO" ||
+    user?.role === "SMEAL" ||
+    user?.role === "SUPER_ADMIN";
 
   // Active quarter configuration
   const activeQuarterConfig = useMemo(() => {

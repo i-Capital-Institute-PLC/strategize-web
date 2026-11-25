@@ -508,6 +508,26 @@ export function AddTaskDialog({
       'draft', 'compile', 'process', 'verify', 'confirm',
       'validate', 'engage', 'execute', 'onboard', 'facilitate',
       'provide',
+      'prepare update meeting',
+      'monitoring',
+      'onboarding',
+      'on-board',
+      'communicating',
+      'truck',
+      'trucking',
+      'revise',
+      'revising',
+      'progress',
+      'progress report',
+      'progress-report',
+      'attending',
+      'approving',
+      'training',
+      'cascading',
+      'facilitating',
+      'conducting',
+      'reviewing',
+      'developing',
       // Technical development
       'build', 'design', 'refactor', 'integrate', 'configure',
       'optimize', 'debug', 'migrate', 'release', 'maintain',
@@ -558,7 +578,13 @@ export function AddTaskDialog({
     if (isPlanningForm) {
       const words = task.trim().split(/\s+/);
       const firstWord = words[0].toLowerCase();
-      if (!QUALIFYING_VERBS.includes(firstWord)) {
+      const firstTwoWords = words.length >= 2 ? `${words[0]} ${words[1]}`.toLowerCase() : '';
+      const firstThreeWords = words.length >= 3 ? `${words[0]} ${words[1]} ${words[2]}`.toLowerCase() : '';
+      const hasValidVerb =
+        QUALIFYING_VERBS.includes(firstWord) ||
+        (firstTwoWords && QUALIFYING_VERBS.includes(firstTwoWords)) ||
+        (firstThreeWords && QUALIFYING_VERBS.includes(firstThreeWords));
+      if (!hasValidVerb) {
         console.error("❌ [TASK CREATION] Validation failed: Invalid action verb");
         toast.error(
           "Task must start with an action verb (e.g., Prepare, Submit, Meet, Review)",
@@ -895,10 +921,10 @@ export function AddTaskDialog({
               )}
 
               {taskType === "KPI_FULFILLED" && (
-                <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-900 dark:border-green-900/60 dark:bg-green-950/30 dark:text-green-200">
-                  KPI Fulfilled is always marked Done. Saving it creates a Draft
-                  logbook achievement that must be completed and submitted by
-                  session end.
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                  KPI Fulfilled starts as <strong>Done Pending</strong> and only
+                  changes to <strong>Done</strong> once its linked logbook
+                  achievement is approved by your immediate manager.
                 </div>
               )}
 
@@ -1452,7 +1478,7 @@ export function AddTaskDialog({
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {taskType === "KPI_FULFILLED"
-                    ? "KPI Fulfilled tasks must remain Done."
+                    ? "KPI Fulfilled stays Done Pending until approved by your immediate manager."
                     : "Choose Not Done, Done, Postponed, or Cancelled."}
                 </p>
               </div>

@@ -52,6 +52,8 @@ interface Task {
   carryoverGeneration?: number;
   isCarryoverOverdue?: boolean;
   carryoverEscalatedAt?: string | null;
+  isApprovalOverdue?: boolean;
+  approvalEscalatedAt?: string | null;
 }
 
 interface CheckInTableRowProps {
@@ -68,6 +70,8 @@ interface CheckInTableRowProps {
 
 const STATUS_COLORS: Record<string, string> = {
   DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  DONE_PENDING:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
   NOT_DONE: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   POSTPONED:
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
@@ -220,6 +224,14 @@ export function CheckInTableRow({
                 <AlertTriangleIcon className="h-3 w-3" /> Overdue
               </Badge>
             )}
+            {(task.isApprovalOverdue || task.approvalEscalatedAt) && (
+              <Badge
+                className="gap-1 bg-red-600 text-[10px] text-white"
+                title="KPI Fulfilled task has remained Done Pending for 2+ weeks without immediate manager approval"
+              >
+                <AlertTriangleIcon className="h-3 w-3" /> Unapproved 2+ wks
+              </Badge>
+            )}
             {isOverdueFulfilled && (
               <Badge className="bg-red-100 text-[10px] text-red-800 dark:bg-red-900/30 dark:text-red-300">
                 Logbook overdue
@@ -292,9 +304,11 @@ export function CheckInTableRow({
           className={`whitespace-nowrap text-[10px] ${STATUS_COLORS[task.checkoutStatus] || STATUS_COLORS.NOT_DONE
             }`}
         >
-          {task.checkoutStatus
-            ? task.checkoutStatus.replace("_", " ")
-            : "Unknown"}
+          {task.checkoutStatus === "DONE_PENDING"
+            ? "Done Pending"
+            : task.checkoutStatus
+              ? task.checkoutStatus.replace("_", " ")
+              : "Unknown"}
           {task.checkoutStatus === "DONE" &&
             task.requiresApproval &&
             !task.approvedAt

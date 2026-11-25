@@ -85,7 +85,10 @@ export default function BulkKpiAssignmentDialog({
       calculationBasisSource === "LINKED_KPI");
 
   const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin =
+    user?.role === "ADMIN" ||
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "SMEAL";
 
   // Determine what we're assigning to
   const childLevel =

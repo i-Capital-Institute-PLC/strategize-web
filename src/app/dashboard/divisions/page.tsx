@@ -36,7 +36,8 @@ const DivisionsPage = () => {
 
   // Get permissions to check if user can access employees
   const { guards } = usePermissions();
-  const canAccessEmployees = guards.isAdmin || guards.isSuperAdmin;
+  const canAccessEmployees =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR;
   const organizationId = useOrganizationId();
 
   // GraphQL queries
@@ -398,7 +399,7 @@ const DivisionsPage = () => {
               onEditSuccess={() => {
                 refetchDivisions();
               }}
-              readOnly={!(guards.isAdmin || guards.isSuperAdmin || guards.isDirector)}
+              readOnly={!(guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR || guards.isDirector)}
             />
           </div>
 

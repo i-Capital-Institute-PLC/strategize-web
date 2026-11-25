@@ -35,6 +35,7 @@ import { useDepartmentMutations } from "@/hooks/departments/useDepartmentMutatio
 import { toast } from "sonner";
 import { SortableFilterableHeader } from "@/components/ui/sortable-filterable-header";
 import { useTableColumnControls } from "@/hooks/table/useTableColumnControls";
+import { usePermissions } from "@/hooks/permissions/usePermissions";
 
 // Department interface matching the design
 export interface Department {
@@ -89,6 +90,8 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({
   onEditSuccess,
 }) => {
   const router = useRouter();
+  const { guards } = usePermissions();
+  const canDelete = !readOnly && !guards.isHR;
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(
     new Set()
   );
@@ -190,8 +193,8 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({
 
   return (
     <>
-      {/* Selection Action Bar - only show for admins */}
-      {!readOnly && someSelected && (
+      {/* Selection Action Bar - only show when delete is permitted */}
+      {canDelete && someSelected && (
         <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
           <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
             {selectedIds.size} department{selectedIds.size !== 1 ? "s" : ""}{" "}
@@ -220,8 +223,8 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({
       <Table className="border-none">
         <TableHeader>
           <TableRow className="bg-muted/60 hover:bg-muted/60">
-            {/* Only show checkbox column for admins */}
-            {!readOnly && (
+            {/* Only show checkbox column when delete is permitted */}
+            {canDelete && (
               <TableHead className="px-4 py-3 w-12">
                 <Checkbox
                   checked={allSelected}
@@ -291,8 +294,8 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({
                   } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer`}
                 onClick={() => router.push(`/dashboard/departments/${dept.id}`)}
               >
-                {/* Only show checkbox for admins */}
-                {!readOnly && (
+                {/* Only show checkbox when delete is permitted */}
+                {canDelete && (
                   <TableCell
                     className="px-4 py-4 w-12"
                     onClick={(e) => e.stopPropagation()}
@@ -380,21 +383,23 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({
                               Edit
                             </DropdownMenuItem>
                           </EditDepartmentDialog>
-                          <DeleteDepartmentDialog
-                            departmentName={dept.departmentName}
-                            departmentId={dept.id}
-                            onDeleteSuccess={onDeleteSuccess}
-                          >
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onSelect={(e) => {
-                                e.preventDefault();
-                              }}
+                          {canDelete && (
+                            <DeleteDepartmentDialog
+                              departmentName={dept.departmentName}
+                              departmentId={dept.id}
+                              onDeleteSuccess={onDeleteSuccess}
                             >
-                              <Trash2 className="h-4 w-4" color="red" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DeleteDepartmentDialog>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" color="red" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DeleteDepartmentDialog>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}

@@ -58,9 +58,9 @@ const EmployeesPage = () => {
     role,
   } = usePermissions();
 
-  const canAccessEmployees = guards.isManagement;
+  const canAccessEmployees = guards.isManagement || guards.isHR;
   const isAdmin = guards.isAdmin || guards.isSuperAdmin;
-  const hasOrganizationWideAccess = isAdmin || role === EmployeeRole.HR;
+  const hasOrganizationWideAccess = isAdmin || guards.isHR || (role as string) === "HR";
 
   // The backend scopes this query to the caller's role and managed organization unit.
   const { data, previousData, loading, error } = useQuery<{

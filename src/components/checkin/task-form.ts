@@ -12,13 +12,14 @@ export const DEFAULT_TASK_TYPE: TaskType = "KPI_UNMET";
 export type TaskEditMode = "PLANNING" | "CHECKOUT";
 
 export interface CheckoutStatusOption {
-  value: "NOT_DONE" | "DONE" | "POSTPONED" | "CANCELLED";
+  value: "NOT_DONE" | "DONE" | "DONE_PENDING" | "POSTPONED" | "CANCELLED";
   label: string;
 }
 
 export const CHECKOUT_STATUS_OPTIONS: ReadonlyArray<CheckoutStatusOption> = [
   { value: "NOT_DONE", label: "Not Done" },
   { value: "DONE", label: "Done" },
+  { value: "DONE_PENDING", label: "Done Pending" },
   { value: "POSTPONED", label: "Postponed" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
@@ -56,10 +57,12 @@ export function getStatusAfterTaskTypeChange(
   nextType: TaskType,
   currentStatus?: string | null,
 ): CheckoutStatusOption["value"] {
-  // DONE is mandatory for KPI Fulfilled, not an explicit completion decision
-  // for a different type selected during planning.
+  // DONE_PENDING is mandatory for KPI Fulfilled, not an explicit completion
+  // decision for a different type selected during planning.
   if (previousType === "KPI_FULFILLED" && nextType !== previousType)
     return "NOT_DONE";
+  if (nextType === "KPI_FULFILLED" && previousType !== "KPI_FULFILLED")
+    return "DONE_PENDING";
   return normalizeCheckoutStatus(nextType, currentStatus);
 }
 
@@ -67,17 +70,21 @@ export function getCheckoutStatusOptions(
   taskType: TaskType,
 ): ReadonlyArray<CheckoutStatusOption> {
   return taskType === "KPI_FULFILLED"
-    ? CHECKOUT_STATUS_OPTIONS.filter((status) => status.value === "DONE")
-    : CHECKOUT_STATUS_OPTIONS;
+    ? CHECKOUT_STATUS_OPTIONS.filter(
+        (status) => status.value === "DONE_PENDING",
+      )
+    : CHECKOUT_STATUS_OPTIONS.filter((status) => status.value !== "DONE_PENDING");
 }
 
 export function normalizeCheckoutStatus(
   taskType: TaskType,
   currentStatus?: string | null,
 ): CheckoutStatusOption["value"] {
-  if (taskType === "KPI_FULFILLED") return "DONE";
+  if (taskType === "KPI_FULFILLED") {
+    return currentStatus === "DONE" ? "DONE" : "DONE_PENDING";
+  }
   return CHECKOUT_STATUS_OPTIONS.some(
-    (status) => status.value === currentStatus,
+    (status) => status.value === currentStatus && status.value !== "DONE_PENDING",
   )
     ? (currentStatus as CheckoutStatusOption["value"])
     : "NOT_DONE";

@@ -34,9 +34,12 @@ function TemplatesPanel({ canManage }: { canManage: boolean }) {
 
 export default function StructurePage() {
   const { root, loading, error, refetch } = useOrgChart();
-  const isCeo = useAuthStore((state) => state.user?.role === "CEO");
+  const isCeo = useAuthStore(
+    (state) => state.user?.role === "CEO" || state.user?.role === "DCEO",
+  );
   const canManageStructure = useAuthStore(
-    (state) => state.user?.role === "SUPER_ADMIN",
+    (state) =>
+      state.user?.role === "SUPER_ADMIN" || state.user?.role === "SMEAL",
   );
   const [templatesOpen, setTemplatesOpen] = useState(false);
 

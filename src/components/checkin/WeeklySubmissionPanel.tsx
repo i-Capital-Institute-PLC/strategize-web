@@ -45,6 +45,8 @@ interface WeeklySubmissionPanelProps {
   summary?: TaskPoolSummary;
   selectedCount: number;
   selectedKpiFulfilledCount: number;
+  selectedNewKpiFulfilledCount?: number;
+  carriedOverKpiFulfilledCount?: number;
   draftTaskCount?: number;
   bulkSelectableCount?: number;
   requiredCarryoverCount?: number;
@@ -61,6 +63,8 @@ export function WeeklySubmissionPanel({
   summary,
   selectedCount,
   selectedKpiFulfilledCount,
+  selectedNewKpiFulfilledCount,
+  carriedOverKpiFulfilledCount = 0,
   draftTaskCount = 0,
   bulkSelectableCount = 0,
   requiredCarryoverCount = 0,
@@ -76,11 +80,13 @@ export function WeeklySubmissionPanel({
   const maximum = summary?.maximumSubmissionCount ?? 10;
   const activeCount = summary?.activeCount ?? 0;
   const capacity = summary?.maximumActiveTaskCount ?? 15;
+  const effectiveNewKpiFulfilledCount =
+    selectedNewKpiFulfilledCount ?? selectedKpiFulfilledCount;
   const countIsValid = selectedCount >= minimum && selectedCount <= maximum;
-  const hasKpiFulfilled = selectedKpiFulfilledCount >= 1;
+  const hasKpiFulfilled = effectiveNewKpiFulfilledCount >= 1;
   const selectionIsValid = canSubmitWeeklyTasks(
     selectedCount,
-    selectedKpiFulfilledCount,
+    effectiveNewKpiFulfilledCount,
     minimum,
     maximum,
   );
@@ -185,7 +191,9 @@ export function WeeklySubmissionPanel({
           ) : (
             <AlertCircleIcon className="h-4 w-4 text-amber-600" aria-hidden="true" />
           )}
-          {selectedKpiFulfilledCount} KPI_FULFILLED selected (at least 1 required)
+          {carriedOverKpiFulfilledCount > 0
+            ? `${selectedKpiFulfilledCount} KPI_FULFILLED selected (${effectiveNewKpiFulfilledCount} new + ${carriedOverKpiFulfilledCount} carryover — at least 1 new required, ${1 + carriedOverKpiFulfilledCount}+ total)`
+            : `${selectedKpiFulfilledCount} KPI_FULFILLED selected (at least 1 required)`}
         </p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           The linked logbook may remain Draft when you submit the weekly plan; it

@@ -56,7 +56,10 @@ const AddDepartmentDialog: React.FC<AddDepartmentDialogProps> = ({
 }) => {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isAdmin =
+    user?.role === 'ADMIN' ||
+    user?.role === 'SUPER_ADMIN' ||
+    user?.role === 'SMEAL';
 
   const handleMemberToggle = (memberId: string) => {
     setDepartmentMembers(

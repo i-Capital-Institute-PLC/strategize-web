@@ -22,23 +22,28 @@ interface DashboardDepartment {
   } | null;
 }
 
-export default function AnalyticsSummary() {
+export default function AnalyticsSummary({
+  viewMode = "organization",
+}: {
+  viewMode?: "organization" | "personal";
+}) {
   const selectedUnit = useOrgUnitStore((state) => state.selectedUnit);
   const user = useAuthStore((state) => state.user);
   const authLoading = useAuthStore((state) => state.isLoading);
   const { annualTimeline, selectedPeriod, selectionValidated } =
     useStrategicPeriodStore();
+  const effectiveRole = viewMode === "personal" ? "NORMAL" : user?.role;
 
   const primaryDepartment = user?.departments?.[0] as
     | DashboardDepartment
     | undefined;
   const fallbackUnit =
-    user?.role === "DIRECTOR" && primaryDepartment?.division?.divisionId
+    effectiveRole === "DIRECTOR" && primaryDepartment?.division?.divisionId
       ? {
           id: primaryDepartment.division.divisionId,
           type: "division" as const,
         }
-      : (user?.role === "MANAGER" || user?.role === "COORDINATOR") &&
+      : (effectiveRole === "MANAGER" || effectiveRole === "COORDINATOR") &&
           primaryDepartment?.departmentId
         ? {
             id: primaryDepartment.departmentId,
@@ -47,16 +52,16 @@ export default function AnalyticsSummary() {
         : null;
   const effectiveUnit = selectedUnit || fallbackUnit;
   const roleSelectedUnit =
-    (user?.role === "MANAGER" ||
-      user?.role === "COORDINATOR" ||
-      user?.role === "DIRECTOR") &&
+    (effectiveRole === "MANAGER" ||
+      effectiveRole === "COORDINATOR" ||
+      effectiveRole === "DIRECTOR") &&
     effectiveUnit
       ? { id: effectiveUnit.id, type: effectiveUnit.type }
       : null;
   const requiresOrgUnit =
-    user?.role === "MANAGER" ||
-    user?.role === "COORDINATOR" ||
-    user?.role === "DIRECTOR";
+    effectiveRole === "MANAGER" ||
+    effectiveRole === "COORDINATOR" ||
+    effectiveRole === "DIRECTOR";
   const contextReady = isDashboardAnalyticsContextReady({
     authLoading,
     hasUser: !!user,
@@ -69,7 +74,7 @@ export default function AnalyticsSummary() {
 
   const analytics = useAnalytics({
     selectedUnit: roleSelectedUnit,
-    userRole: user?.role,
+    userRole: effectiveRole,
     userId: user?.employeeId,
     organizationId: user?.organizationId,
     annualTimeline,
@@ -94,7 +99,7 @@ export default function AnalyticsSummary() {
     },
   ];
 
-  if (user?.role === "DIRECTOR") {
+  if (effectiveRole === "DIRECTOR") {
     metrics.push({
       title: "Departments",
       value: analytics.departmentsCount,
@@ -104,7 +109,7 @@ export default function AnalyticsSummary() {
     });
   }
 
-  if (user?.role === "MANAGER" || user?.role === "DIRECTOR") {
+  if (effectiveRole === "MANAGER" || effectiveRole === "DIRECTOR") {
     metrics.push({
       title: "Employees",
       value: analytics.employeesCount,
@@ -114,7 +119,12 @@ export default function AnalyticsSummary() {
     });
   }
 
-  if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") {
+  if (
+    effectiveRole === "ADMIN" ||
+    effectiveRole === "SUPER_ADMIN" ||
+    effectiveRole === "SMEAL" ||
+    effectiveRole === "HR"
+  ) {
     metrics.push(
       {
         title: "Initiatives",

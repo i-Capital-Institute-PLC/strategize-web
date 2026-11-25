@@ -36,6 +36,7 @@ function EvaluationsContent() {
     if (tab) setActiveTab(tab);
   }, [searchParams]);
 
+  const canReadOwnEvaluations = can("evaluations:read_own");
   const canManageEvaluations = can("evaluations:manage");
   const canReadDepartment =
     can("evaluations:read_department") ||
@@ -97,18 +98,22 @@ function EvaluationsContent() {
           >
             Overview
           </TabsTrigger>
-          <TabsTrigger
-            value="my-evaluations"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 px-4 py-3"
-          >
-            My Evaluations
-          </TabsTrigger>
-          <TabsTrigger
-            value="results"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 px-4 py-3"
-          >
-            Results
-          </TabsTrigger>
+          {canReadOwnEvaluations && (
+            <TabsTrigger
+              value="my-evaluations"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 px-4 py-3"
+            >
+              My Evaluations
+            </TabsTrigger>
+          )}
+          {canReadOwnEvaluations && (
+            <TabsTrigger
+              value="results"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 px-4 py-3"
+            >
+              Results
+            </TabsTrigger>
+          )}
           {canReadDepartment && (
             <TabsTrigger
               value="team-results"
@@ -131,13 +136,17 @@ function EvaluationsContent() {
           <EvaluationOverview />
         </TabsContent>
 
-        <TabsContent value="my-evaluations" className="mt-6">
-          <MyEvaluations />
-        </TabsContent>
+        {canReadOwnEvaluations && (
+          <TabsContent value="my-evaluations" className="mt-6">
+            <MyEvaluations />
+          </TabsContent>
+        )}
 
-        <TabsContent value="results" className="mt-6">
-          <EvaluationResults />
-        </TabsContent>
+        {canReadOwnEvaluations && (
+          <TabsContent value="results" className="mt-6">
+            <EvaluationResults />
+          </TabsContent>
+        )}
 
         {canReadDepartment && (
           <TabsContent value="team-results" className="mt-6">

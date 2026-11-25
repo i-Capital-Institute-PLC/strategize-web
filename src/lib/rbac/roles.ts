@@ -12,11 +12,13 @@ import type { EmployeeRole } from '@/types/graphql';
 // Role hierarchy levels (higher number = more privileges)
 export const ROLE_HIERARCHY: Record<EmployeeRole, number> = {
   CEO: 0, // Observer role: never inherit administrator or manager write access.
+  DCEO: 0, // Executive observer role: strictly read-only organization oversight.
   NORMAL: 0,
   COORDINATOR: 1,
   MANAGER: 2,
   DIRECTOR: 3,
   HR: 4,
+  SMEAL: 4,
   ADMIN: 5,
   SUPER_ADMIN: 6,
 };
@@ -24,11 +26,13 @@ export const ROLE_HIERARCHY: Record<EmployeeRole, number> = {
 // Role display labels
 export const ROLE_LABELS: Record<EmployeeRole, string> = {
   CEO: 'CEO',
+  DCEO: 'Deputy CEO',
   NORMAL: 'Employee',
   COORDINATOR: 'Coordinator',
   MANAGER: 'Manager',
   DIRECTOR: 'Director',
   HR: 'HR',
+  SMEAL: 'SMEAL',
   ADMIN: 'Admin',
   SUPER_ADMIN: 'Super Admin',
 };
@@ -36,14 +40,69 @@ export const ROLE_LABELS: Record<EmployeeRole, string> = {
 // Role descriptions
 export const ROLE_DESCRIPTIONS: Record<EmployeeRole, string> = {
   CEO: 'Organization-wide monitoring, read-only administration and direct-report leadership logbook review',
+  DCEO: 'Organization-wide executive oversight of strategy, structure, KPIs, 360° evaluations, and analytics',
   NORMAL: 'Regular employee with access to personal objectives and KPIs',
   COORDINATOR: 'Department coordinator with limited management capabilities',
   MANAGER: 'Department manager with full department-level access',
   DIRECTOR: 'Division director with division-wide access',
   HR: 'HR manager with access to all employee data and evaluations',
+  SMEAL: 'Strategy, monitoring, evaluation, organizational structure and KPI formula administration',
   ADMIN: 'Corporate administrator with organization-wide access',
   SUPER_ADMIN: 'System administrator with full system access',
 };
+
+// Base permissions for regular employees (NORMAL)
+const NORMAL_BASE_PERMISSIONS: Permission[] = [
+  // Profile
+  'employees:read_own',
+  'employees:update_own',
+
+  // Objectives - own only
+  'objectives:read_own',
+  'objectives:create_personnel',
+  'objectives:update_own',
+  'objectives:submit',
+
+  // KPIs - own only
+  'kpis:read_own',
+  'kpis:create_own',
+  'kpis:update_own',
+  'kpis:submit',
+  'kpis:set_targets',
+
+  // Submissions
+  'submissions:read_own',
+  'submissions:create',
+
+  // Analytics & Reports
+  'analytics:read_own',
+  'reports:read_own',
+
+  // Strategic periods (read only)
+  'strategic_periods:read',
+
+  // Check-ins
+  'checkins:read_own',
+  'checkins:create',
+  'checkins:update_own',
+  'checkins:delete_own',
+
+  // Logbook
+  'logbook:read_own',
+  'logbook:submit',
+  'logbook:delete_own',
+
+  // Navigation
+  'nav:dashboard',
+  'nav:objectives',
+  'nav:reports',
+  'nav:settings',
+  'nav:checkin',
+  'nav:logbook',
+
+  // Evaluations
+  'evaluations:read_own',
+];
 
 /**
  * Base permissions for each role (before inheritance)
@@ -59,59 +118,20 @@ const BASE_ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
     'nav:dashboard', 'nav:reports', 'nav:approvals', 'nav:admin', 'nav:settings',
     'nav:divisions', 'nav:departments', 'nav:checkin', 'nav:logbook',
   ],
+  DCEO: [
+    'employees:read_all', 'objectives:read_all', 'kpis:read_all',
+    'objectives:approve_division', 'objectives:approve_corporate',
+    'kpis:approve_division', 'kpis:approve_corporate',
+    'submissions:read_all', 'submissions:approve_division', 'submissions:approve_corporate',
+    'divisions:read_all', 'departments:read_all', 'strategic_periods:read',
+    'analytics:read_all', 'reports:read_all', 'reports:export',
+    'checkins:read_all', 'logbook:read_all', 'logbook:approve', 'evaluations:read_all',
+    'nav:dashboard', 'nav:objectives', 'nav:divisions', 'nav:departments',
+    'nav:reports', 'nav:approvals', 'nav:strategy_period', 'nav:settings',
+  ],
   // ==================== NORMAL (Employee) ====================
   // Can only manage their own data
-  NORMAL: [
-    // Profile
-    'employees:read_own',
-    'employees:update_own',
-
-    // Objectives - own only
-    'objectives:read_own',
-    'objectives:create_personnel',
-    'objectives:update_own',
-    'objectives:submit',
-
-    // KPIs - own only
-    'kpis:read_own',
-    'kpis:create_own',
-    'kpis:update_own',
-    'kpis:submit',
-    'kpis:set_targets',
-
-    // Submissions
-    'submissions:read_own',
-    'submissions:create',
-
-    // Analytics & Reports
-    'analytics:read_own',
-    'reports:read_own',
-
-    // Strategic periods (read only)
-    'strategic_periods:read',
-
-    // Check-ins
-    'checkins:read_own',
-    'checkins:create',
-    'checkins:update_own',
-    'checkins:delete_own',
-
-    // Logbook
-    'logbook:read_own',
-    'logbook:submit',
-    'logbook:delete_own',
-
-    // Navigation
-    'nav:dashboard',
-    'nav:objectives',
-    'nav:reports',
-    'nav:settings',
-    'nav:checkin',
-    'nav:logbook',
-
-    // Evaluations
-    'evaluations:read_own',
-  ],
+  NORMAL: NORMAL_BASE_PERMISSIONS,
 
   // ==================== COORDINATOR ====================
   // Department-level coordinator with limited approval authority
@@ -229,23 +249,115 @@ const BASE_ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
   ],
 
   // ==================== HR ====================
-  // HR management with access to all employee data and evaluations
+  // HR management with access to employee creation, assignment, evaluations
+  // Inherits 100% of Employee (NORMAL) self-service capabilities
   HR: [
-    // Employees - read all
+    ...NORMAL_BASE_PERMISSIONS,
+    // Employees - full HR management
     'employees:read_all',
+    'employees:create',
+    'employees:update_all',
+    'employees:assign_role_advanced',
+    'employees:assign_role_basic',
+
+    // Departments and Divisions - view, manage, and assign
+    'departments:read_all',
+    'departments:create',
+    'departments:update_all',
+    'departments:add_employee',
+    'departments:remove_employee',
+    'divisions:read_all',
+    'divisions:create',
+    'divisions:update_all',
+    'divisions:assign_manager',
 
     // Analytics & Reports
     'analytics:read_all',
     'reports:read_all',
+    'reports:export',
 
-    // Evaluations - full access
+    // Evaluations - full access and own completion
     'evaluations:read_all',
+    'evaluations:read_own',
     'evaluations:manage',
     'evaluations:assign',
 
     // Navigation
+    'nav:dashboard',
     'nav:employees',
+    'nav:departments',
+    'nav:divisions',
     'nav:reports',
+    'nav:checkin',
+    'nav:logbook',
+  ],
+
+  // ==================== SMEAL ====================
+  // Strategy, Monitoring, Evaluation, Accountability, and Learning
+  // Inherits 100% of Employee (NORMAL) self-service capabilities
+  SMEAL: [
+    ...NORMAL_BASE_PERMISSIONS,
+
+    // Strategy cascading & Periods
+    'strategic_periods:read',
+    'strategic_periods:create',
+    'strategic_periods:update',
+
+    // Objectives - corporate, division, department cascading
+    'objectives:read_all',
+    'objectives:create_corporate',
+    'objectives:create_division',
+    'objectives:create_department',
+    'objectives:update_all',
+    'objectives:assign_division',
+    'objectives:assign_department',
+
+    // KPIs - formulas, scorecards, weight adjustments
+    'kpis:read_all',
+    'kpis:create_corporate',
+    'kpis:create_division',
+    'kpis:create_department',
+    'kpis:update_all',
+    'kpis:set_targets',
+
+    // Organizational structure - divisions and departments/units
+    'divisions:read_all',
+    'divisions:create',
+    'divisions:update_all',
+    'departments:read_all',
+    'departments:create',
+    'departments:update_all',
+
+    // Employees - read all
+    'employees:read_all',
+
+    // Check-ins - create & manage corporate sessions
+    'checkins:read_all',
+    'checkins:create',
+    'checkins:update_all',
+
+    // Logbooks - view all draft & submitted individual logbooks
+    'logbook:read_all',
+
+    // 360 Evaluations - set matrices and view results
+    'evaluations:read_all',
+    'evaluations:manage',
+    'evaluations:assign',
+
+    // Analytics & Reports - performance, task-completion, unified results
+    'analytics:read_all',
+    'reports:read_all',
+    'reports:export',
+
+    // Navigation
+    'nav:dashboard',
+    'nav:objectives',
+    'nav:divisions',
+    'nav:departments',
+    'nav:reports',
+    'nav:strategy_period',
+    'nav:checkin',
+    'nav:logbook',
   ],
 
   // ==================== ADMIN ====================
@@ -341,11 +453,24 @@ const BASE_ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
  */
 export function getRolePermissions(role: EmployeeRole): Permission[] {
   if (role === 'CEO') return [...BASE_ROLE_PERMISSIONS.CEO];
+  if (role === 'DCEO') return [...BASE_ROLE_PERMISSIONS.DCEO];
+  if (role === 'HR') {
+    return Array.from(new Set([
+      ...NORMAL_BASE_PERMISSIONS,
+      ...BASE_ROLE_PERMISSIONS.HR,
+    ]));
+  }
+  if (role === 'SMEAL') {
+    return Array.from(new Set([
+      ...NORMAL_BASE_PERMISSIONS,
+      ...BASE_ROLE_PERMISSIONS.SMEAL,
+    ]));
+  }
   const roleLevel = ROLE_HIERARCHY[role];
   const allPermissions = new Set<Permission>();
 
   // Get permissions from this role and all lower roles
-  const roles: EmployeeRole[] = ['NORMAL', 'COORDINATOR', 'MANAGER', 'DIRECTOR', 'HR', 'ADMIN', 'SUPER_ADMIN'];
+  const roles: EmployeeRole[] = ['NORMAL', 'COORDINATOR', 'MANAGER', 'DIRECTOR', 'HR', 'SMEAL', 'ADMIN', 'SUPER_ADMIN'];
 
   for (const r of roles) {
     if (ROLE_HIERARCHY[r] <= roleLevel) {
@@ -373,6 +498,13 @@ export function hasMinimumRole(
 ): boolean {
   if (!userRole) return false;
   if (minimumRole === 'CEO') return userRole === 'CEO';
+  if (minimumRole === 'DCEO') return userRole === 'DCEO';
+  if (userRole === 'HR') {
+    return minimumRole === 'NORMAL' || minimumRole === 'HR';
+  }
+  if (userRole === 'SMEAL') {
+    return minimumRole === 'NORMAL' || minimumRole === 'SMEAL';
+  }
   const userLevel = ROLE_HIERARCHY[userRole as EmployeeRole] ?? -1;
   const requiredLevel = ROLE_HIERARCHY[minimumRole];
   return userLevel >= requiredLevel;
@@ -384,9 +516,11 @@ export function hasMinimumRole(
 export function getAssignableRoles(assignerRole: EmployeeRole | string | undefined): EmployeeRole[] {
   switch (assignerRole) {
     case 'SUPER_ADMIN':
-      return ['NORMAL', 'COORDINATOR', 'MANAGER', 'DIRECTOR', 'HR', 'ADMIN', 'SUPER_ADMIN', 'CEO'];
+      return ['NORMAL', 'COORDINATOR', 'MANAGER', 'DIRECTOR', 'HR', 'SMEAL', 'DCEO', 'ADMIN', 'SUPER_ADMIN', 'CEO'];
     case 'ADMIN':
-      return ['NORMAL', 'COORDINATOR', 'MANAGER', 'DIRECTOR', 'HR', 'CEO'];
+      return ['NORMAL', 'COORDINATOR', 'MANAGER', 'DIRECTOR', 'HR', 'SMEAL', 'DCEO', 'CEO'];
+    case 'HR':
+      return ['NORMAL', 'COORDINATOR', 'MANAGER', 'DIRECTOR', 'HR', 'SMEAL', 'DCEO'];
     case 'DIRECTOR':
       return ['NORMAL', 'COORDINATOR', 'MANAGER'];
     default:

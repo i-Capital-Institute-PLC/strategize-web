@@ -52,9 +52,11 @@ const EditObjectiveDialog: React.FC<EditObjectiveDialogProps> = ({
     useState<ObjectiveStatus>("NOT_SUBMITTED");
   const [strategicPeriodId, setStrategicPeriodId] = useState("");
 
-  // Check if user is at corporate level (ADMIN or SUPER_ADMIN)
+  // Check if user is at corporate level (ADMIN, SUPER_ADMIN, or SMEAL)
   const isCorporateUser =
-    user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+    user?.role === "ADMIN" ||
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "SMEAL";
   const isNonCorporateUser = !isCorporateUser;
 
   // Initialize form with objective data when dialog opens

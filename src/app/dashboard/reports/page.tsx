@@ -88,15 +88,19 @@ function ReportsContent() {
     [selectedPeriod, strategicPeriods],
   );
 
-  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "HR", "CEO"]);
+  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO"]);
   const hasFullAccess =
     !!user?.role && fullAccessRoles.has(user.role as string);
   
-  const managerRoles = new Set(["MANAGER", "DIRECTOR", "CEO", "SUPER_ADMIN", "ADMIN", "HR"]);
+  const managerRoles = new Set(["MANAGER", "DIRECTOR", "CEO", "DCEO", "SUPER_ADMIN", "ADMIN", "SMEAL", "HR"]);
   const isManager = !!user?.role && managerRoles.has(user.role as string);
 
   const isExecutiveMonthlyAllowed =
-    user?.role === "CEO" || user?.role === "SUPER_ADMIN";
+    user?.role === "CEO" ||
+    user?.role === "DCEO" ||
+    user?.role === "SMEAL" ||
+    user?.role === "SUPER_ADMIN";
+  const isExecutiveOnly = user?.role === "CEO" || user?.role === "DCEO";
 
   // Fetch performance summary for metrics
   const { data: summaryData, loading: summaryLoading } = useQuery(GET_REPORTS_SUMMARY, {
@@ -213,9 +217,10 @@ function ReportsContent() {
     const raw = searchParams.get("tab");
     const paramTab =
       raw === "my-submissions" ? "submissions" : raw;
-    if (paramTab && !(user?.role === 'CEO' && paramTab === 'submissions')) return paramTab;
+    if (paramTab && !(isExecutiveOnly && paramTab === 'submissions')) return paramTab;
 
     if (user?.role === "CEO") return "ceo-monthly";
+    if (user?.role === "DCEO") return "quarterly";
     if (hasFullAccess) return "kpi-performance";
     if (isManager) return "performance";
     return "individual";
@@ -249,6 +254,12 @@ function ReportsContent() {
   };
 
   const handleExport = (data: any, reportName: string) => {
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      toast.error("No report data available to export", {
+        description: "Adjust filters or select a period with data first.",
+      });
+      return;
+    }
     try {
       exportReport(data, reportName, "csv");
       toast.success("Report exported successfully!", {
@@ -256,7 +267,7 @@ function ReportsContent() {
       });
     } catch (error) {
       toast.error("Failed to export report", {
-        description: "Please try again.",
+        description: error instanceof Error ? error.message : "Please try again.",
       });
     }
   };
@@ -672,8 +683,8 @@ function ReportsContent() {
                 <span className="sm:hidden">Individual</span>
               </TabsTrigger>
 
-              {/* My Submissions - All users */}
-              {user?.role !== "CEO" && (
+              {/* My Submissions - Non-executive users */}
+              {!isExecutiveOnly && (
                 <TabsTrigger
                   value="submissions"
                   className="flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-indigo-400 sm:text-sm"
@@ -766,8 +777,8 @@ function ReportsContent() {
               </TabsContent>
             )}
 
-            {/* My Submissions (All Users) */}
-            {user?.role !== "CEO" && visitedTabs.has("submissions") && (
+            {/* My Submissions (Non-executive users) */}
+            {!isExecutiveOnly && visitedTabs.has("submissions") && (
               <TabsContent
                 value="submissions"
                 forceMount

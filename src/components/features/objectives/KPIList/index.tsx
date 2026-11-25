@@ -203,6 +203,7 @@ const KPIList: React.FC<KPIListProps> = ({
       can("kpis:update_all") ||
       guards.isSuperAdmin ||
       guards.isAdmin ||
+      guards.isSMEAL ||
       guards.isDirector ||
       guards.isManager);
 

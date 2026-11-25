@@ -34,7 +34,8 @@ const DivisionDetailsPage = () => {
   // Get permissions to check if user can access employees
   const { guards, scope } = usePermissions();
   const user = useAuthStore((state) => state.user);
-  const canAccessEmployees = guards.isAdmin || guards.isSuperAdmin;
+  const canAccessEmployees =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR;
 
   // Query to get basic division info (without departments to avoid manager constraint)
   const {
@@ -50,7 +51,8 @@ const DivisionDetailsPage = () => {
     }
   );
 
-  const isGlobalAdmin = guards.isAdmin || guards.isSuperAdmin;
+  const isGlobalAdmin =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR;
   const isMyDivision =
     isGlobalAdmin ||
     (guards.isDirector &&

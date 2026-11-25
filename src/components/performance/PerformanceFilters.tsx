@@ -39,6 +39,8 @@ const ROLE_OPTIONS = [
   { value: 'MANAGER', label: 'Manager' },
   { value: 'DIRECTOR', label: 'Director' },
   { value: 'HR', label: 'HR' },
+  { value: 'SMEAL', label: 'SMEAL' },
+  { value: 'DCEO', label: 'Deputy CEO' },
   { value: 'ADMIN', label: 'Admin' },
   { value: 'SUPER_ADMIN', label: 'Super Admin' },
 ];

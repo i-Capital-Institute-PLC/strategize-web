@@ -26,7 +26,8 @@ export default function KpisPage() {
   const selectedUnit = useOrgUnitStore((state) => state.selectedUnit);
   const organizationId = user?.organizationId || "";
 
-  const isGlobalRole = ["SUPER_ADMIN", "ADMIN", "CEO"].includes(user?.role || "");
+  const isGlobalRole = ["SUPER_ADMIN", "ADMIN", "CEO", "DCEO", "SMEAL"].includes(user?.role || "");
+  const isReadOnlyExecutive = user?.role === "CEO" || user?.role === "DCEO";
 
   const primaryDepartment = user?.departments?.[0] as
     | {
@@ -119,17 +120,19 @@ export default function KpisPage() {
         </div>
         <div className="flex items-center gap-2">
           <SyncButton onSync={handleSyncKpis} label="Sync" />
-          <Button
-            disabled={isOffboarded}
-            title={isOffboarded ? "KPI creation is closed for offboarded accounts." : undefined}
-            onClick={() => {
-              if (isOffboarded) return;
-              setShowCreate(true);
-            }}
-            className={isOffboarded ? "opacity-50 cursor-not-allowed" : ""}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> New KPI
-          </Button>
+          {!isReadOnlyExecutive && (
+            <Button
+              disabled={isOffboarded}
+              title={isOffboarded ? "KPI creation is closed for offboarded accounts." : undefined}
+              onClick={() => {
+                if (isOffboarded) return;
+                setShowCreate(true);
+              }}
+              className={isOffboarded ? "opacity-50 cursor-not-allowed" : ""}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> New KPI
+            </Button>
+          )}
         </div>
       </div>
 
