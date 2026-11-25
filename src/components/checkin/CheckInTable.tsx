@@ -41,6 +41,8 @@ interface Task {
   carryoverGeneration?: number;
   isCarryoverOverdue?: boolean;
   carryoverEscalatedAt?: string | null;
+  isApprovalOverdue?: boolean;
+  approvalEscalatedAt?: string | null;
   sessionId?: string | null;
 }
 

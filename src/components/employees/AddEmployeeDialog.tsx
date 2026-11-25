@@ -29,6 +29,7 @@ import {
   EmployeeStatus,
 } from "@/types/graphql";
 import { useRoles } from "@/hooks/permissions/usePermissionManagement";
+import { getAssignableRoles } from "@/lib/rbac";
 
 interface AddEmployeeDialogProps {
   children: React.ReactNode;
@@ -84,6 +85,7 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ children, onSucce
 
   const { createEmployee, createLoading } = useEmployeeMutations();
   const { roles, loading: rolesLoading } = useRoles(1, 100); // Fetch all active roles
+  const assignableRoles = React.useMemo(() => getAssignableRoles(user?.role), [user?.role]);
 
   // Validation function
   const validateForm = (): boolean => {
@@ -359,7 +361,7 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ children, onSucce
                     <SelectItem value="empty" disabled>No roles available</SelectItem>
                   ) : (
                     roles
-                      .filter((role: any) => !role.isDeleted) // Only show active roles
+                      .filter((role: any) => !role.isDeleted && (assignableRoles.length === 0 || assignableRoles.includes(role.code as EmployeeRole))) // Only show roles the user can assign
                       .map((role: any) => (
                         <SelectItem key={role.roleId} value={role.code}>
                           <div className="flex flex-col">

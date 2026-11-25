@@ -586,6 +586,8 @@ export default function PromoteEmployeeDialog({
                       <SelectItem value="MANAGER">MANAGER (Department Head)</SelectItem>
                       <SelectItem value="DIRECTOR">DIRECTOR (Division Head)</SelectItem>
                       <SelectItem value="HR">HR</SelectItem>
+                      <SelectItem value="SMEAL">SMEAL (Strategy, Monitoring &amp; Evaluation)</SelectItem>
+                      <SelectItem value="DCEO">DCEO (Deputy CEO)</SelectItem>
                       <SelectItem value="ADMIN">ADMIN</SelectItem>
                     </SelectContent>
                   </Select>

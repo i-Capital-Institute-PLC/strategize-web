@@ -3,6 +3,9 @@
 import { useState, useMemo } from "react";
 import { useAuthStore } from '@/stores';
 import { CeoLogbookMonitor } from '@/components/logbook/CeoLogbookMonitor';
+import { OrganizationLogbooksMonitor } from '@/components/logbook/OrganizationLogbooksMonitor';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { User, Users } from "lucide-react";
 import { useQuery } from "@apollo/client";
 import { GET_LOGBOOK_ENTRIES } from "@/lib/graphql/queries/logbook";
 import { GET_ME } from "@/lib/graphql/queries/auth";
@@ -54,7 +57,35 @@ const mapEntryToFrontend = (entry: any): FrontendLogbookItem => ({
 
 export default function LogbookPage() {
   const role = useAuthStore((state) => state.user?.role);
-  return role === 'CEO' ? <CeoLogbookMonitor /> : <PersonalLogbookPage />;
+
+  if (role === 'CEO') {
+    return <CeoLogbookMonitor />;
+  }
+
+  if (role === 'SMEAL') {
+    return (
+      <Tabs defaultValue="organization" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="organization" className="gap-2">
+            <Users className="h-4 w-4" />
+            Organization Logbooks
+          </TabsTrigger>
+          <TabsTrigger value="personal" className="gap-2">
+            <User className="h-4 w-4" />
+            My Personal Logbook
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="organization">
+          <OrganizationLogbooksMonitor />
+        </TabsContent>
+        <TabsContent value="personal">
+          <PersonalLogbookPage />
+        </TabsContent>
+      </Tabs>
+    );
+  }
+
+  return <PersonalLogbookPage />;
 }
 
 function PersonalLogbookPage() {

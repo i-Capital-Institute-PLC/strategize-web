@@ -40,6 +40,8 @@ const TASK_PLANNING_MUTATION_FIELDS = gql`
     carryoverGeneration
     isCarryoverOverdue
     carryoverEscalatedAt
+    isApprovalOverdue
+    approvalEscalatedAt
     createdAt
     updatedAt
     approvedBy {
@@ -189,6 +191,8 @@ export const CREATE_CHECKINOUT_TASK = gql`
       carryoverGeneration
       isCarryoverOverdue
       carryoverEscalatedAt
+      isApprovalOverdue
+      approvalEscalatedAt
       createdAt
       updatedAt
       approvedAt

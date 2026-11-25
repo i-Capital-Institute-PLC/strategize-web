@@ -62,8 +62,12 @@ export default function SubmissionApprovalsTable({
 
   // Determine approver role based on user's actual role and context
   const getApproverRole = (): "CORPORATE" | "DIVISION" | "DEPARTMENT" => {
-    // For corporate users (ADMIN, SUPER_ADMIN), they handle corporate-level approvals
-    if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") {
+    // For corporate users (ADMIN, SUPER_ADMIN, DCEO), they handle corporate-level approvals
+    if (
+      user?.role === "ADMIN" ||
+      user?.role === "SUPER_ADMIN" ||
+      user?.role === "DCEO"
+    ) {
       return "CORPORATE";
     }
 

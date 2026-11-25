@@ -5,13 +5,84 @@
 
 export type ExportFormat = "csv" | "json";
 
+function flattenRecord(
+  record: Record<string, unknown>,
+  prefix = "",
+  out: Record<string, unknown> = {},
+): Record<string, unknown> {
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "__typename") continue;
+    const colKey = prefix ? `${prefix}_${key}` : key;
+    if (value == null || typeof value !== "object") {
+      out[colKey] = value;
+    } else if (Array.isArray(value)) {
+      out[colKey] =
+        value.length === 0
+          ? ""
+          : value
+              .map((item) =>
+                item && typeof item === "object"
+                  ? JSON.stringify(item)
+                  : String(item ?? ""),
+              )
+              .join("; ");
+    } else {
+      flattenRecord(value as Record<string, unknown>, colKey, out);
+    }
+  }
+  return out;
+}
+
+function normalizeExportRows(data: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(data)) {
+    return data
+      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+      .map((item) => flattenRecord(item));
+  }
+  if (!data || typeof data !== "object") return [];
+
+  const obj = data as Record<string, unknown>;
+  const nestedData =
+    obj.data && typeof obj.data === "object"
+      ? (obj.data as Record<string, unknown>)
+      : null;
+
+  const candidateArrays = [
+    obj.kpis,
+    obj.results,
+    obj.rows,
+    obj.items,
+    obj.employeesByDept,
+    obj.employeesByDiv,
+    obj.topKPIs,
+    nestedData?.results,
+    nestedData?.kpis,
+    nestedData?.rows,
+  ];
+  for (const candidate of candidateArrays) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate
+        .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+        .map((item) => flattenRecord(item));
+    }
+  }
+
+  return [flattenRecord(obj)];
+}
+
 /**
  * Convert data to CSV format
  */
 function convertToCSV(data: Array<Record<string, unknown>>): string {
   if (!data || data.length === 0) return "";
 
-  const headers = Object.keys(data[0]);
+  const headerSet = new Set<string>();
+  for (const row of data) {
+    for (const key of Object.keys(row)) {
+      headerSet.add(key);
+    }
+  }
+  const headers = Array.from(headerSet);
   const csvRows = [];
 
   // Add header row
@@ -27,7 +98,12 @@ function convertToCSV(data: Array<Record<string, unknown>>): string {
 }
 
 function escapeCSVValue(value: unknown): string {
-  const raw = value == null ? "" : String(value);
+  const raw =
+    value == null
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
   const safe = /^[\t\r ]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
   const escaped = safe.replace(/"/g, '""');
   return /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
@@ -42,32 +118,24 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.style.display = "none";
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 1000);
 }
 
 /**
  * Export report data to CSV
  */
 export function exportToCSV(data: unknown, filename: string) {
-  let csvContent = "";
-
-  // Handle different data structures
-  if (Array.isArray(data)) {
-    csvContent = convertToCSV(data as Array<Record<string, unknown>>);
-  } else if (data !== null && typeof data === "object") {
-    // Convert object to array of key-value pairs
-    const flatData = Object.entries(data as Record<string, unknown>).map(
-      ([key, value]) => ({
-        metric: key,
-        value: typeof value === "object" ? JSON.stringify(value) : value,
-      }),
-    );
-    csvContent = convertToCSV(flatData);
+  const rows = normalizeExportRows(data);
+  if (rows.length === 0) {
+    throw new Error("No data available to export");
   }
-
+  const csvContent = `\uFEFF${convertToCSV(rows)}`;
   const timestamp = new Date().toISOString().split("T")[0];
   const fullFilename = `${filename}_${timestamp}.csv`;
 
@@ -102,8 +170,7 @@ export function exportReport(
   };
 
   if (format === "csv") {
-    // For CSV, export just the data array
-    exportToCSV(Array.isArray(data) ? data : [data], reportName);
+    exportToCSV(data, reportName);
   } else {
     // For JSON, export everything including metadata
     exportToJSON(reportData, reportName);

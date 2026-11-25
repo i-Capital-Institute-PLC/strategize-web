@@ -36,7 +36,10 @@ const ObjectiveFilterBar: React.FC<ObjectiveFilterBarProps> = ({
 }) => {
   const hasActiveFilters = searchTerm || statusFilter !== "all";
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin =
+    user?.role === "ADMIN" ||
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "SMEAL";
 
   // Only show the Add Objective button on the Corporate tab
   const isCorporateTab = !activeTab || activeTab === "corporate";

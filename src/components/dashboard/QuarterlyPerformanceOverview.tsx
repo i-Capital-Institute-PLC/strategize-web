@@ -29,7 +29,7 @@ const scopeLabels = {
 } as const;
 
 function primaryLevelForRole(role?: string): ScorecardLevel {
-  if (["SUPER_ADMIN", "ADMIN", "HR", "CEO"].includes(role || "")) {
+  if (["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO"].includes(role || "")) {
     return "CORPORATE";
   }
   if (role === "DIRECTOR") return "DIVISION";
@@ -51,7 +51,11 @@ function LoadingDashboard() {
   );
 }
 
-export default function QuarterlyPerformanceOverview() {
+export default function QuarterlyPerformanceOverview({
+  viewMode = "organization",
+}: {
+  viewMode?: "organization" | "personal";
+}) {
   const user = useAuthStore((state) => state.user);
   const selectedPeriod = useStrategicPeriodStore((state) => state.selectedPeriod);
   const selectionValidated = useStrategicPeriodStore(
@@ -90,15 +94,16 @@ export default function QuarterlyPerformanceOverview() {
   }, [selectedPeriod, strategicPeriods]);
 
   const annualStrategicPeriodId = context?.annualPeriod.strategicPeriodId;
+  const isPersonalMode = viewMode === "personal" && Boolean(user?.employeeId);
   // A support KPI is still an owned, scored KPI for the assigned department
   // or division. Corporate monitoring keeps TARGET_ALLOCATION isolated to
   // avoid counting the same support contribution twice at enterprise level.
-  const includeOwnedSupportKpis = ["MANAGER", "DIRECTOR"].includes(
-    user?.role || "",
-  );
+  const includeOwnedSupportKpis =
+    isPersonalMode || ["MANAGER", "DIRECTOR"].includes(user?.role || "");
   const sharedDirectFilters = {
     annualStrategicPeriodId,
     quarterNumber: context?.quarterNumber,
+    ...(isPersonalMode ? { employeeId: user?.employeeId } : {}),
     ...(includeOwnedSupportKpis
       ? {}
       : { cascadeType: "TARGET_ALLOCATION" }),
@@ -117,7 +122,7 @@ export default function QuarterlyPerformanceOverview() {
     variables: {
       filters: {
         ...sharedDirectFilters,
-        level: primaryLevelForRole(user?.role),
+        level: isPersonalMode ? "INDIVIDUAL" : primaryLevelForRole(user?.role),
       },
     },
     skip,
@@ -205,7 +210,11 @@ export default function QuarterlyPerformanceOverview() {
         supportReport={supportData?.supportPerformanceReport}
         selectedQuarter={context.quarterNumber}
         selectedQuarterPeriod={context.reportingPeriod}
-        scopeLabel={scopeLabels[primaryReport.scope] || "Performance"}
+        scopeLabel={
+          isPersonalMode
+            ? scopeLabels.SELF
+            : scopeLabels[primaryReport.scope] || "Performance"
+        }
       />
     </div>
   );

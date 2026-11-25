@@ -46,11 +46,14 @@ export function kpiSubmissionsQueryVariables(
  */
 export function inboundLevelsForApprover(
   approverRole: ApproverRole,
+  isDceo = false,
 ): ObjectiveType[] {
   switch (approverRole) {
     case "CORPORATE":
-      // Division submissions + orphaned department submissions
-      return ["DIVISION", "DEPARTMENT"];
+      // Division submissions + standalone CEO-Office department submissions (plus CEO-Office direct personnel for DCEO)
+      return isDceo
+        ? ["DIVISION", "DEPARTMENT", "PERSONNEL"]
+        : ["DIVISION", "DEPARTMENT"];
     case "DIVISION":
       return ["DEPARTMENT"];
     case "DEPARTMENT":

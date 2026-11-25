@@ -24,7 +24,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, Activity, Eye, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Shield, Activity, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle2, XCircle, Search, RotateCcw } from "lucide-react";
 
 export default function LogsPage() {
   const [activeTab, setActiveTab] = useState("activity");
@@ -314,14 +315,16 @@ function ActivityLogsTab() {
 
 function AuditLogsTab() {
   const [page, setPage] = useState(1);
-  const limit = 20;
+  const [limit, setLimit] = useState(25);
   const [actionFilter, setActionFilter] = useState("ALL");
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedLog, setSelectedLog] = useState<any>(null);
 
-  const { auditLogs, meta, loading } = useAuditLogs({
+  const { auditLogs, meta, loading, refetch } = useAuditLogs({
     page,
     limit,
     action: actionFilter === "ALL" ? undefined : actionFilter,
+    search: searchTerm.trim() || undefined,
   });
 
   const formatDate = (date: string) => {
@@ -334,22 +337,82 @@ function AuditLogsTab() {
     });
   };
 
+  const handleActionChange = (val: string) => {
+    setActionFilter(val);
+    setPage(1);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setPage(1);
+  };
+
+  const handleLimitChange = (val: string) => {
+    setLimit(Number(val));
+    setPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setActionFilter("ALL");
+    setSearchTerm("");
+    setPage(1);
+  };
+
+  const hasActiveFilters = actionFilter !== "ALL" || searchTerm.trim() !== "";
+
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
-      <div className="flex items-center justify-between">
-        <Select value={actionFilter} onValueChange={setActionFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filter Action" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Actions</SelectItem>
-            <SelectItem value="CREATE">Create</SelectItem>
-            <SelectItem value="UPDATE">Update</SelectItem>
-            <SelectItem value="DELETE">Delete</SelectItem>
-            <SelectItem value="LOGIN">Login</SelectItem>
-            <SelectItem value="APPROVE">Approve</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Search, Action Filter, and Page Size Controls */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search Superadmin, email, or KPI..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="pl-8 w-full"
+            />
+          </div>
+
+          <Select value={actionFilter} onValueChange={handleActionChange}>
+            <SelectTrigger className="w-full sm:w-[160px]">
+              <SelectValue placeholder="Filter Action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Actions</SelectItem>
+              <SelectItem value="APPROVE">Approved</SelectItem>
+              <SelectItem value="REJECT">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearFilters}
+              className="h-9 px-2 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              Reset
+            </Button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span className="text-xs text-gray-500 hidden md:inline">Show:</span>
+          <Select value={String(limit)} onValueChange={handleLimitChange}>
+            <SelectTrigger className="w-[110px] h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 / page</SelectItem>
+              <SelectItem value="25">25 / page</SelectItem>
+              <SelectItem value="50">50 / page</SelectItem>
+              <SelectItem value="100">100 / page</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-[#18181b] rounded-xl border border-gray-200 dark:border-gray-800 table-container">
@@ -357,8 +420,8 @@ function AuditLogsTab() {
           <TableHeader>
             <TableRow className="bg-gray-50 dark:bg-gray-900/50">
               <TableHead>Action</TableHead>
-              <TableHead className="hidden md:table-cell">Entity Type</TableHead>
-              <TableHead className="hidden lg:table-cell">Entity ID</TableHead>
+              <TableHead>Performed By</TableHead>
+              <TableHead>Item / Target</TableHead>
               <TableHead className="hidden xl:table-cell">IP Address</TableHead>
               <TableHead className="hidden sm:table-cell">Date</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -374,22 +437,44 @@ function AuditLogsTab() {
             ) : auditLogs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                  No audit logs found.
+                  No audit logs found matching your filters.
                 </TableCell>
               </TableRow>
             ) : (
               auditLogs.map((log) => (
                 <TableRow key={log.auditLogId} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
                   <TableCell>
-                    <Badge variant="outline" className="font-normal text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border-indigo-200">
-                      {log.action}
-                    </Badge>
+                    {log.action?.toUpperCase() === 'APPROVE' ? (
+                      <Badge variant="outline" className="font-normal text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200">
+                        {log.action}
+                      </Badge>
+                    ) : log.action?.toUpperCase() === 'REJECT' ? (
+                      <Badge variant="outline" className="font-normal text-xs bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-200">
+                        {log.action}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="font-normal text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border-indigo-200">
+                        {log.action}
+                      </Badge>
+                    )}
                   </TableCell>
-                  <TableCell className="font-medium text-gray-900 dark:text-gray-100 hidden md:table-cell">
-                    {log.entityType || "—"}
+                  <TableCell>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      {log.userName || "Admin"}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {log.userEmail || "—"}
+                    </div>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-600 dark:text-gray-400 font-mono text-xs hidden lg:table-cell">
-                    {log.entityId || "—"}
+                  <TableCell>
+                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {log.entityLabel || log.entityType || "—"}
+                    </div>
+                    {log.entityId && (
+                      <div className="text-xs text-gray-400 font-mono">
+                        #{log.entityId.slice(0, 8)}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-gray-500 font-mono text-xs hidden xl:table-cell">
                     {log.ipAddress || "—"}
@@ -409,32 +494,61 @@ function AuditLogsTab() {
         </Table>
       </div>
 
-      {meta && meta.totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="mobile-text text-gray-500">
-            Showing {(meta.currentPage - 1) * meta.itemsPerPage + 1} to{" "}
-            {Math.min(meta.currentPage * meta.itemsPerPage, meta.totalItems)} of {meta.totalItems} entries
+      {meta && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+          <p className="mobile-text text-gray-500 text-xs sm:text-sm">
+            {meta.totalItems > 0 ? (
+              <>
+                Showing {(meta.currentPage - 1) * meta.itemsPerPage + 1} to{" "}
+                {Math.min(meta.currentPage * meta.itemsPerPage, meta.totalItems)} of {meta.totalItems} entries
+              </>
+            ) : (
+              "0 entries"
+            )}
           </p>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+            <span className="text-xs text-gray-500 mr-2 hidden sm:inline">
+              Page {meta.currentPage} of {meta.totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(1)}
+              disabled={page <= 1}
+              className="h-8 px-2 text-xs"
+              title="First Page"
+            >
+              <ChevronsLeft className="h-3.5 w-3.5" />
+            </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="flex-1 sm:flex-none"
+              disabled={page <= 1}
+              className="h-8 px-2.5 text-xs"
             >
-              <ChevronLeft className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">Previous</span>
+              <ChevronLeft className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Prev</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-              disabled={page === meta.totalPages}
-              className="flex-1 sm:flex-none"
+              disabled={page >= meta.totalPages}
+              className="h-8 px-2.5 text-xs"
             >
               <span className="hidden sm:inline">Next</span>
-              <ChevronRight className="h-4 w-4 sm:ml-1" />
+              <ChevronRight className="h-3.5 w-3.5 sm:ml-1" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(meta.totalPages)}
+              disabled={page >= meta.totalPages}
+              className="h-8 px-2 text-xs"
+              title="Last Page"
+            >
+              <ChevronsRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -461,6 +575,18 @@ function AuditLogsTab() {
               </div>
 
               <div className="grid grid-cols-2 gap-y-3">
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400 block">Performed By</span>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{selectedLog.userName || "Admin"}</div>
+                  <div className="text-xs text-gray-500">{selectedLog.userEmail || "N/A"}</div>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400 block">Target / Item</span>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{selectedLog.entityLabel || selectedLog.entityType || "N/A"}</div>
+                  {selectedLog.entityId && (
+                    <div className="font-mono text-xs text-gray-400">#{selectedLog.entityId.slice(0, 8)}</div>
+                  )}
+                </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400 block">Entity Type</span>
                   <span className="font-medium">{selectedLog.entityType || "N/A"}</span>

@@ -1,9 +1,11 @@
 export const ROLE_HIERARCHY: Record<string, number> = {
+  DCEO: 0,
   NORMAL: 0,
   COORDINATOR: 1,
   MANAGER: 2,
   DIRECTOR: 3,
   HR: 4,
+  SMEAL: 4,
   ADMIN: 5,
   SUPER_ADMIN: 6,
 };
@@ -14,7 +16,10 @@ type RoutePolicy =
 
 const ROUTE_POLICIES: Record<string, RoutePolicy> = {
   "/dashboard/admin/evidence-approvers": { allowedRoles: ["SUPER_ADMIN"] },
+  "/dashboard/admin/kpi-formulas": { allowedRoles: ["SMEAL", "ADMIN", "SUPER_ADMIN"] },
   "/dashboard/admin": { minimumRole: "ADMIN" },
+  "/dashboard/semi-annual-config": { allowedRoles: ["SMEAL", "ADMIN", "SUPER_ADMIN"] },
+  "/dashboard/semi-annual-report": { allowedRoles: ["HR", "SMEAL", "SUPER_ADMIN"] },
   "/dashboard/employees": { minimumRole: "MANAGER" },
   "/dashboard/positions": { allowedRoles: ["HR", "SUPER_ADMIN"] },
   "/dashboard/teams": { allowedRoles: ["HR", "SUPER_ADMIN"] },
@@ -56,6 +61,7 @@ export function canRoleAccessRoute(
 ): boolean {
   if (!userRole) return false;
   if (userRole === 'CEO') return canCeoAccessRoute(pathname);
+  if (userRole === 'DCEO') return canDceoAccessRoute(pathname);
 
   const policy = getRoutePolicy(pathname);
   if (!policy) return true;
@@ -82,6 +88,39 @@ export function canCeoAccessRoute(path: string): boolean {
     '/dashboard/admin/logs', '/dashboard/settings',
   ];
   return exact.includes(pathname) || /^\/dashboard\/(kpis|objectives)\/[0-9a-f-]{36}$/.test(pathname);
+}
+
+/** Executive-only read-only observer surface for Deputy CEO (DCEO). */
+export function canDceoAccessRoute(path: string): boolean {
+  const [pathname, query] = path.split('?');
+  if (new URLSearchParams(query).get('tab') === 'submissions') return false;
+  const exact = [
+    '/dashboard',
+    '/strategy-period',
+    '/dashboard/strategic-plans',
+    '/dashboard/objectives',
+    '/dashboard/initiatives',
+    '/dashboard/kpis',
+    '/dashboard/structure',
+    '/dashboard/divisions',
+    '/dashboard/departments',
+    '/dashboard/units',
+    '/dashboard/performance',
+    '/dashboard/kpi-scorecard',
+    '/dashboard/kpi-weight',
+    '/dashboard/task-completion',
+    '/dashboard/flagged-kpis',
+    '/dashboard/evaluations',
+    '/dashboard/reports',
+    '/dashboard/approvals',
+    '/dashboard/settings',
+  ];
+  return (
+    exact.includes(pathname) ||
+    /^\/dashboard\/(kpis|objectives|divisions|departments)\/[0-9a-f-]{36}$/.test(
+      pathname,
+    )
+  );
 }
 
 export function getRouteRoleRequirement(pathname: string): string | null {

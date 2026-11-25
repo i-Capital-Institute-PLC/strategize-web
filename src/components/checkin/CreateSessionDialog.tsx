@@ -96,7 +96,7 @@ export default function CreateSessionDialog({
   const currentUser = userData?.me;
   const safeCurrentUserId = currentUserId || currentUser?.employeeId || "";
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
-  const isAdmin = currentUser?.role === "ADMIN" || isSuperAdmin;
+  const isAdmin = currentUser?.role === "ADMIN" || currentUser?.role === "SMEAL" || isSuperAdmin;
 
   // Debug logging
   console.log("👤 Current User:", currentUser);
@@ -113,7 +113,7 @@ export default function CreateSessionDialog({
         page: 1,
         limit: 1000,
       },
-      skip: currentUser?.role !== "ADMIN" || userLoading,
+      skip: (currentUser?.role !== "ADMIN" && currentUser?.role !== "SMEAL") || userLoading,
       fetchPolicy: "cache-first",
       nextFetchPolicy: "cache-first",
     },

@@ -40,6 +40,9 @@ const TASK_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  DONE_PENDING:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
   NOT_DONE: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   POSTPONED:
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",

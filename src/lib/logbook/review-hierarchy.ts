@@ -1,7 +1,7 @@
 export type LogbookReviewDepartment = {
   departmentId?: string;
   headUserId?: string | null;
-  head?: { employeeId?: string | null } | null;
+  head?: { employeeId?: string | null; role?: string | null } | null;
   division?: {
     divisionId?: string;
     headUserId?: string | null;
@@ -11,6 +11,7 @@ export type LogbookReviewDepartment = {
 
 export type LogbookReviewUser = {
   managerId?: string | null;
+  manager?: { employeeId?: string | null; role?: string | null } | null;
   employeeId?: string;
   role?: string | null;
   departments?: LogbookReviewDepartment[] | null;
@@ -49,6 +50,34 @@ export function canReviewLogbookOwner(
             !department.division,
         )
       ))
+    );
+  }
+
+  if (currentUserRole === "DCEO") {
+    if (owner.managerId) {
+      return (
+        owner.managerId === currentUser.employeeId ||
+        String(owner.manager?.role || "").toUpperCase() === "CEO"
+      );
+    }
+    if (ownerRole === "DIRECTOR") return true;
+    const headsStandaloneDept = departments.some(
+      (department) =>
+        (department.head?.employeeId || department.headUserId) ===
+          owner.employeeId && !department.division,
+    );
+    if (headsStandaloneDept) return true;
+    const headsAnyDept = departments.some(
+      (department) =>
+        (department.head?.employeeId || department.headUserId) ===
+        owner.employeeId,
+    );
+    if (headsAnyDept) return false;
+    return Boolean(
+      owner.departments?.some((department) => {
+        const headRole = String(department.head?.role || "").toUpperCase();
+        return headRole === "CEO" || headRole === "DCEO";
+      }),
     );
   }
 

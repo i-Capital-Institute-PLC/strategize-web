@@ -77,7 +77,7 @@ export function QuarterPerformanceCell({
 }: QuarterPerformanceCellProps) {
   const { user } = useAuth();
   const client = useApolloClient();
-  const canFinalize = ["HR", "ADMIN", "SUPER_ADMIN"].includes(user?.role ?? "");
+  const canFinalize = ["HR", "SMEAL", "ADMIN", "SUPER_ADMIN"].includes(user?.role ?? "");
   const [finalizingQuarter, setFinalizingQuarter] = useState<number | null>(
     null,
   );

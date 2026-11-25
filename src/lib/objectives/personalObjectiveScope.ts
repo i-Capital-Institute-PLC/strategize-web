@@ -1,8 +1,15 @@
 /** Match the personal (non-management) objectives view, including HR. */
 export function usesPersonalObjectiveScope(role?: string | null): boolean {
-  return !["SUPER_ADMIN", "ADMIN", "DIRECTOR", "MANAGER", "COORDINATOR"].includes(
-    role || "",
-  );
+  return ![
+    "SUPER_ADMIN",
+    "ADMIN",
+    "SMEAL",
+    "DCEO",
+    "CEO",
+    "DIRECTOR",
+    "MANAGER",
+    "COORDINATOR",
+  ].includes(role || "");
 }
 
 export function isPersonalObjectiveAssignment(

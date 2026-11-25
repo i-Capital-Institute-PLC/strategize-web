@@ -27,6 +27,10 @@ export const CORE_AUDIT_LOG_FIELDS = gql`
     action
     entityType
     entityId
+    entityLabel
+    userId
+    userEmail
+    userName
     ipAddress
     userAgent
     createdAt
@@ -78,6 +82,7 @@ export const GET_AUDIT_LOGS = gql`
     $userId: ID
     $entityType: String
     $organizationId: ID
+    $search: String
   ) {
     auditLogs(
       page: $page
@@ -86,6 +91,7 @@ export const GET_AUDIT_LOGS = gql`
       userId: $userId
       entityType: $entityType
       organizationId: $organizationId
+      search: $search
     ) {
       items {
         ...CoreAuditLogFields

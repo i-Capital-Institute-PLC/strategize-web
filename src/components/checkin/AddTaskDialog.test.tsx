@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@apollo/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@apollo/client")>()),
+  useApolloClient: () => ({ query: vi.fn() }),
   useMutation: () => [mocks.save, { loading: false }],
   useQuery: () => ({
     data: {
@@ -33,8 +34,15 @@ vi.mock("@apollo/client", async (importOriginal) => ({
 vi.mock("@/stores", () => ({
   useAuthStore: (select: (state: unknown) => unknown) =>
     select({ user: mocks.user }),
+  useOrgUnitStore: (select: (state: unknown) => unknown) =>
+    select({ selectedUnit: null }),
+  useStrategicPeriodStore: (select: (state: unknown) => unknown) =>
+    select({ selectedPeriod: null }),
 }));
-vi.mock("@/utils/fileUpload", () => ({ uploadFile: vi.fn() }));
+vi.mock("@/utils/fileUpload", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/fileUpload")>()),
+  uploadFile: vi.fn(),
+}));
 vi.mock("@/utils/error-handling", () => ({
   showErrorToast: vi.fn(),
   showSuccessToast: vi.fn(),
@@ -61,7 +69,7 @@ const task = {
   relatedToEmployeeId: "",
   startTime: "2026-07-21T08:00:00.000Z",
   endTime: "2026-07-21T10:00:00.000Z",
-  checkoutStatus: "DONE",
+  checkoutStatus: "DONE_PENDING",
   submissionStatus: "DRAFT",
   isMidWeekTask: false,
   planningRevision: 2,
@@ -135,7 +143,7 @@ describe("returned task planning editor", () => {
     await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
     expect(mocks.save.mock.calls[0][0].variables.input).toMatchObject({
       taskLinkType: "KPI_FULFILLED",
-      taskStatus: "DONE",
+      taskStatus: "DONE_PENDING",
     });
   });
 

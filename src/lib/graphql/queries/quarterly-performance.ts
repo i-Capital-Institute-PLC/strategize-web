@@ -21,6 +21,12 @@ export const GET_KPI_QUARTER_PERFORMANCE_REPORT = gql`
           parentId
           parentIds
         }
+        units {
+          id
+          name
+          parentId
+          parentIds
+        }
         employees {
           id
           name
@@ -99,6 +105,8 @@ export const GET_KPI_QUARTER_PERFORMANCE_REPORT = gql`
         parentKpiId
         measurementUnit
         unitType
+        strategicPillarName
+        kpiCategory
         customUnitLabel
         quarterlyAggregationMethod
         calculationType
@@ -148,6 +156,8 @@ export const GET_KPI_QUARTER_PERFORMANCE_REPORT = gql`
         parentKpiId
         measurementUnit
         unitType
+        strategicPillarName
+        kpiCategory
         customUnitLabel
         quarterlyAggregationMethod
         calculationType
@@ -174,6 +184,8 @@ export const GET_KPI_QUARTER_PERFORMANCE_REPORT = gql`
         parentKpiId
         measurementUnit
         unitType
+        strategicPillarName
+        kpiCategory
         customUnitLabel
         quarterlyAggregationMethod
         calculationType
@@ -221,6 +233,8 @@ export const GET_KPI_QUARTER_PERFORMANCE_REPORT = gql`
         weightingBasisKpiName
         unitType
         measurementUnit
+        strategicPillarName
+        kpiCategory
         customUnitLabel
         annualTarget
         weight

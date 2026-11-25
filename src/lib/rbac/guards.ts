@@ -70,6 +70,8 @@ export function canAccessRoute(
     '/dashboard/reports': 'nav:reports',
     '/dashboard/approvals': 'nav:approvals',
     '/dashboard/approvals/my-submissions': 'nav:approvals',
+    '/dashboard/admin/kpi-formulas': 'kpis:create_corporate',
+    '/dashboard/semi-annual-config': 'kpis:create_corporate',
     '/dashboard/admin': 'nav:admin',
     '/dashboard/settings': 'nav:settings',
     '/dashboard/checkin': 'nav:checkin',

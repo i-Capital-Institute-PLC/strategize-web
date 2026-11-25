@@ -51,11 +51,14 @@ export const useSubmissionApprovals = ({
     user &&
     (user.role === "SUPER_ADMIN" ||
       user.role === "ADMIN" ||
+      user.role === "DCEO" ||
       approverRole === "DIVISION" ||
       approverRole === "DEPARTMENT" ||
       selectedUnit ||
       listMode === "outbound"),
   );
+
+  const isDceo = user?.role === "DCEO";
 
   // Fetch all submissions using modular query hook
   // pendingOnly is false so we can support filtering by APPROVED/REJECTED status too
@@ -66,6 +69,7 @@ export const useSubmissionApprovals = ({
   } = useSubmissionQueries({
     shouldFetch: shouldMakeQueries,
     approverRole,
+    isDceo,
     pendingOnly: false,
   });
 
@@ -128,6 +132,7 @@ export const useSubmissionApprovals = ({
           departmentsWithoutDivision,
           departmentsInSelectedDivision,
           effectiveSelectedUnitId,
+          { isDceo, currentUserId: user?.employeeId },
         )
       : listModeFiltered;
 

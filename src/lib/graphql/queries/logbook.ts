@@ -184,16 +184,22 @@ export const GET_LOGBOOK_ENTRIES = gql`
     $entryStatus: LogbookEntryStatus
     $limit: Int!
     $ownerUserId: ID
-    $page: Int!
     $strategicPeriodId: ID
+    $divisionId: ID
+    $departmentId: ID
+    $unitId: ID
+    $page: Int!
     $approverUserId: ID
   ) {
     logbookEntries(
       entryStatus: $entryStatus
       limit: $limit
       ownerUserId: $ownerUserId
-      page: $page
       strategicPeriodId: $strategicPeriodId
+      divisionId: $divisionId
+      departmentId: $departmentId
+      unitId: $unitId
+      page: $page
       approverUserId: $approverUserId
     ) {
       items {

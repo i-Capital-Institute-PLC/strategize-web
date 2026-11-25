@@ -166,9 +166,9 @@ export default function ChartsSection() {
   const roleSelectedUnit =
     (user?.role === "MANAGER" || user?.role === "DIRECTOR") && selectedUnit
       ? {
-          id: selectedUnit.id,
-          type: selectedUnit.type,
-        }
+        id: selectedUnit.id,
+        type: selectedUnit.type,
+      }
       : null;
 
   const analytics = useAnalytics({
@@ -179,7 +179,7 @@ export default function ChartsSection() {
     selectedPeriodId: selectedPeriod?.strategicPeriodId,
   });
 
-  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "HR", "CEO"]);
+  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO"]);
   const hasFullAccess = !!user?.role && fullAccessRoles.has(user.role as string);
   const isDirector = user?.role === "DIRECTOR";
   const isManager = user?.role === "MANAGER" || user?.role === "COORDINATOR";
@@ -340,7 +340,7 @@ export default function ChartsSection() {
     }
 
     const results = teamData.unifiedTeamPerformance.results;
-    
+
     // Performance rating distribution
     const ratingCounts: Record<string, number> = {};
     results.forEach((r: any) => {
@@ -400,8 +400,8 @@ export default function ChartsSection() {
             {hasFullAccess
               ? "Organization-wide KPI insights and performance trends"
               : isManager
-              ? "Team performance distribution and metrics"
-              : "Your performance metrics and objectives"}
+                ? "Team performance distribution and metrics"
+                : "Your performance metrics and objectives"}
           </p>
         </div>
         <div className="text-sm text-gray-500 dark:text-gray-400 text-right">
@@ -437,7 +437,7 @@ export default function ChartsSection() {
                 </Badge>
               )}
             </Button>
-            
+
             {(performanceFilter !== "all" || levelFilter !== "all") && (
               <Button
                 variant="ghost"
@@ -678,7 +678,7 @@ export default function ChartsSection() {
                   chartType="bar"
                   data={teamAnalytics.teamDistData}
                 />
-                
+
                 {/* Team Stats Card */}
                 <Card className="border border-slate-200 dark:border-slate-800">
                   <CardHeader className="pb-3">
@@ -701,7 +701,7 @@ export default function ChartsSection() {
                           {teamAnalytics.ranges["90-100%"]}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 dark:border-slate-900 bg-slate-50/40 dark:bg-slate-950/10">
                         <div className="flex items-center gap-2">
                           <TrendingUp className="h-4 w-4 text-slate-400" />
@@ -713,7 +713,7 @@ export default function ChartsSection() {
                           {teamAnalytics.ranges["75-89%"]}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 dark:border-slate-900 bg-slate-50/40 dark:bg-slate-950/10">
                         <div className="flex items-center gap-2">
                           <Activity className="h-4 w-4 text-slate-400" />

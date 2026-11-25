@@ -44,6 +44,7 @@ export interface FilterState {
 
 const CHECKOUT_STATUS_OPTIONS = [
   { value: "DONE", label: "Done", color: "bg-green-100 text-green-800" },
+  { value: "DONE_PENDING", label: "Done Pending", color: "bg-amber-100 text-amber-800" },
   { value: "CANCELLED", label: "Cancelled", color: "bg-gray-100 text-gray-800" },
   { value: "NOT_DONE", label: "Not Done", color: "bg-red-100 text-red-800" },
   { value: "POSTPONED", label: "Postponed", color: "bg-yellow-100 text-yellow-800" },

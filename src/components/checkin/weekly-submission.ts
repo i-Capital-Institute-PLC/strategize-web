@@ -81,11 +81,19 @@ export function getBulkDraftTaskIds(
 
   if (
     selected.length === maximumSubmissionCount &&
-    !selected.some((task) => task.taskType === "KPI_FULFILLED")
+    !selected.some(
+      (task) =>
+        task.taskType === "KPI_FULFILLED" &&
+        (task.carryoverGeneration ?? 0) === 0,
+    )
   ) {
     const fulfilledTask = eligible
       .filter((task) => !selected.includes(task))
-      .find((task) => task.taskType === "KPI_FULFILLED");
+      .find(
+        (task) =>
+          task.taskType === "KPI_FULFILLED" &&
+          (task.carryoverGeneration ?? 0) === 0,
+      );
     let replacementIndex = selected.length - 1;
     while (
       replacementIndex >= 0 &&

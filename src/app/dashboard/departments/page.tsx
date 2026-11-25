@@ -44,8 +44,10 @@ const DepartmentsPage = () => {
   // Get permissions to check if user can access employees
   const user = useAuthStore((state) => state.user);
   const { guards, scope, isLoading: permissionsLoading } = usePermissions();
-  const canAccessEmployees = guards.isAdmin || guards.isSuperAdmin;
-  const isAdmin = guards.isAdmin || guards.isSuperAdmin;
+  const canAccessEmployees =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR;
+  const isAdmin =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR;
   const isManagement = guards.isDirector || guards.isManager;
   const managerDeptId =
     scope?.managedDepartmentIds?.[0] ||

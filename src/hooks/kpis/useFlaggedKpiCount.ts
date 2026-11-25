@@ -20,6 +20,7 @@ export function useFlaggedKpiCount() {
     "MANAGER",
     "DIRECTOR",
     "CEO",
+    "DCEO",
     "HR",
     "ADMIN",
     "SUPER_ADMIN",

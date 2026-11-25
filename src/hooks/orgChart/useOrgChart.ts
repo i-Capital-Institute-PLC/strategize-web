@@ -34,9 +34,22 @@ export function useOrgChart() {
     nextFetchPolicy: 'cache-first',
   });
 
-  // API returns a flat array of root nodes; we take the first as the tree root
+  // API returns an array of root trees. Prioritize the Level 0 corporate root,
+  // and attach any disconnected/orphan root nodes so nothing is ever omitted.
   const nodes: OrgChartNode[] = data?.getOrgChart ?? [];
-  const root: OrgChartNode | null = nodes[0] ?? null;
+  let root: OrgChartNode | null = null;
+  if (nodes.length > 0) {
+    const corporateRoot = nodes.find((n) => n.level === 0) ?? nodes[0];
+    const otherRoots = nodes.filter((n) => n.id !== corporateRoot.id);
+    if (otherRoots.length > 0) {
+      root = {
+        ...corporateRoot,
+        children: [...corporateRoot.children, ...otherRoots],
+      };
+    } else {
+      root = corporateRoot;
+    }
+  }
 
   return { root, nodes, loading, error, refetch };
 }

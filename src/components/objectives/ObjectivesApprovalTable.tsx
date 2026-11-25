@@ -84,7 +84,8 @@ function ObjectivesApprovalTableContent() {
   // Use RBAC permissions
   const { guards, objectives: objectivePermissions, scope } = usePermissions();
 
-  const isCorporateRole = guards.isAdmin || guards.isSuperAdmin;
+  const isCorporateRole =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isDCEO;
   const showTabs =
     isCorporateRole || guards.isDirector || guards.isManager || guards.isCoordinator;
 
@@ -429,8 +430,8 @@ function ObjectivesApprovalTableContent() {
         return true;
       }
 
-      // For ADMIN/SUPER_ADMIN: Show all objectives, even unassigned ones
-      if (isAdmin || isSuperAdmin) {
+      // For ADMIN/SUPER_ADMIN/SMEAL/DCEO: Show all objectives, even unassigned ones
+      if (isAdmin || isSuperAdmin || guards.isSMEAL || guards.isDCEO) {
         return true;
       }
 
@@ -665,6 +666,8 @@ function ObjectivesApprovalTableContent() {
     isEmployee,
     isManager,
     isDirector,
+    guards.isSMEAL,
+    guards.isDCEO,
     isAdmin,
     isSuperAdmin,
     userEmployeeId,
@@ -682,7 +685,7 @@ function ObjectivesApprovalTableContent() {
   // Set default tab based on role once - MUST be after filteredObjectives is defined
   const [hasSetDefaultTab, setHasSetDefaultTab] = useState(false);
   React.useEffect(() => {
-    if (hasSetDefaultTab || loading) return; // Wait for objectives to load
+    if (hasSetDefaultTab || loading || !userRole) return; // Wait for user & objectives to load
 
     if (isDirector) {
       // For directors, always default to division tab
@@ -706,6 +709,7 @@ function ObjectivesApprovalTableContent() {
     isEmployee,
     isCorporateRole,
     hasSetDefaultTab,
+    userRole,
     objectives,
     selectedUnitId,
     selectedUnitType,
@@ -758,8 +762,8 @@ function ObjectivesApprovalTableContent() {
   // Determine if sorting is enabled (only for users who can edit)
   const canEnableSorting = useMemo(() => {
     // Enable sorting for admins and directors with edit permission
-    return isAdmin || isSuperAdmin || isDirector || isManager;
-  }, [isAdmin, isSuperAdmin, isDirector, isManager]);
+    return isAdmin || isSuperAdmin || guards.isSMEAL || isDirector || isManager;
+  }, [isAdmin, isSuperAdmin, guards.isSMEAL, isDirector, isManager]);
 
   // Handle order change (optimistic update)
   const handleOrderChange = (newOrderedPage: Objective[]) => {
@@ -1299,7 +1303,7 @@ function ObjectivesApprovalTableContent() {
               </div>
 
               {/* Assignee filter when viewing Personnel tab */}
-              {activeTab === "personnel" && (isManager || isCoordinator || isDirector) && (
+              {activeTab === "personnel" && (isManager || isCoordinator || isDirector || isCorporateRole) && (
                 <div className="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200 dark:border-gray-700">
                   <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
                     Assignee:

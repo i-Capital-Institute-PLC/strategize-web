@@ -115,7 +115,9 @@ export default function SubmitDialog({
       }
 
       const isAdminUser =
-        user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+        user?.role === "SUPER_ADMIN" ||
+        user?.role === "ADMIN" ||
+        user?.role === "SMEAL";
       const effectiveStatus = kpiData.status ?? knownKpiStatus;
 
       if (!isAdminUser && !isKpiSubmittable(effectiveStatus)) {

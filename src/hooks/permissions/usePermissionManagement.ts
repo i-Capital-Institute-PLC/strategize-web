@@ -41,7 +41,7 @@ export const usePermissionDefinitions = (page = 1, limit = 50, search = '') => {
 export const useRoles = (page = 1, limit = 50, search = '') => {
   const { data, loading, error, refetch } = useQuery(GET_ROLES, {
     variables: { page, limit, search: search || undefined },
-    fetchPolicy: 'cache-first',
+    fetchPolicy: 'cache-and-network',
     nextFetchPolicy: 'cache-first',
   });
 

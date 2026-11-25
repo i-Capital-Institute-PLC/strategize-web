@@ -96,7 +96,10 @@ export default function UnitsTable({
 
   // Permissions & Role checks
   const { guards } = usePermissions();
-  const canManageUnits = guards.isAdmin || guards.isSuperAdmin;
+  const canManageUnits =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR;
+  const canDeleteUnits =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL;
 
   // Fetch employees for unit lead and members dropdown
   const user = useAuthStore((state) => state.user);
@@ -675,15 +678,17 @@ export default function UnitsTable({
                           >
                             <Pencil className="mr-2 h-4 w-4" /> Edit Unit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteUnit(unit);
-                            }}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete Unit
-                          </DropdownMenuItem>
+                          {canDeleteUnits && (
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteUnit(unit);
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete Unit
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

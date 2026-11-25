@@ -12,13 +12,23 @@ export default function AddObjectivePage() {
 
   // Check if user has permission to access this page
   useEffect(() => {
-    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (
+      user &&
+      user.role !== "ADMIN" &&
+      user.role !== "SUPER_ADMIN" &&
+      user.role !== "SMEAL"
+    ) {
       router.push("/dashboard/objectives");
     }
   }, [user, router]);
 
   // Show loading or redirect if user doesn't have permission
-  if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) {
+  if (
+    !user ||
+    (user.role !== "ADMIN" &&
+      user.role !== "SUPER_ADMIN" &&
+      user.role !== "SMEAL")
+  ) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">

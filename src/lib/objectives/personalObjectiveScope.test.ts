@@ -4,7 +4,7 @@ import { isPersonalObjectiveAssignment, usesPersonalObjectiveScope } from "./per
 describe("personal objective ownership", () => {
   it("scopes all personal-view roles and unresolved identity, without changing management views", () => {
     for (const role of ["NORMAL", "HR", undefined]) expect(usesPersonalObjectiveScope(role)).toBe(true);
-    for (const role of ["ADMIN", "SUPER_ADMIN", "DIRECTOR", "MANAGER", "COORDINATOR"]) expect(usesPersonalObjectiveScope(role)).toBe(false);
+    for (const role of ["ADMIN", "SUPER_ADMIN", "SMEAL", "DCEO", "CEO", "DIRECTOR", "MANAGER", "COORDINATOR"]) expect(usesPersonalObjectiveScope(role)).toBe(false);
   });
   const rows = [
     {

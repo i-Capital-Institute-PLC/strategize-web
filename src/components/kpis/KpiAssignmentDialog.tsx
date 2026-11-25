@@ -135,7 +135,10 @@ export default function KpiAssignmentDialog({
 
   // Fetch employees - filter by department for non-admins
   const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin =
+    user?.role === "ADMIN" ||
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "SMEAL";
 
   const { data: liveKpiData, loading: liveKpiLoading } = useQuery(GET_KPI, {
     variables: { kpiId: kpi.kpiId },

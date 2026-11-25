@@ -65,7 +65,13 @@ export interface MinimalSubmission {
   submittedBy: {
     employeeId?: string;
     fullName: string;
-    departments?: Array<{ departmentId: string; name: string }>;
+    managerId?: string | null;
+    manager?: { employeeId?: string; role?: string } | null;
+    departments?: Array<{
+      departmentId: string;
+      name: string;
+      head?: { employeeId?: string; role?: string } | null;
+    }>;
   };
   objective?: SubmissionObjective | null;
   kpi?: SubmissionKpi | null;

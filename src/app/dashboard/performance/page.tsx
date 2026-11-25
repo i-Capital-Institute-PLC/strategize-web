@@ -96,11 +96,11 @@ export default function PerformancePage() {
 
   const hasTeamView =
     !!userRole &&
-    ["SUPER_ADMIN", "ADMIN", "HR", "CEO", "DIRECTOR", "MANAGER"].includes(
+    ["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO", "DIRECTOR", "MANAGER"].includes(
       userRole,
     );
 
-  const isAdmin = !!userRole && ["SUPER_ADMIN", "ADMIN", "HR", "CEO"].includes(userRole);
+  const isAdmin = !!userRole && ["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO"].includes(userRole);
 
   // Default to team performance for managers/admins, my performance for employees
   const [activeView, setActiveView] = useState<

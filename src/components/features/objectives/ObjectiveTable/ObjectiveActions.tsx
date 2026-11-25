@@ -91,6 +91,7 @@ const ObjectiveActions: React.FC<ObjectiveActionsProps> = ({
     const roleOrder: Record<string, number> = {
       SUPER_ADMIN: 4,
       ADMIN: 4,
+      SMEAL: 4,
       DIRECTOR: 3,
       MANAGER: 2,
       NORMAL: 1,

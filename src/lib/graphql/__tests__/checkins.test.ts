@@ -36,6 +36,8 @@ describe("check-in draft pool GraphQL operations", () => {
       "carryoverGeneration",
       "isCarryoverOverdue",
       "carryoverEscalatedAt",
+      "isApprovalOverdue",
+      "approvalEscalatedAt",
     ]) {
       expect(taskQuery).toContain(field);
       // A newly-created draft has no review rows yet; requesting the non-null

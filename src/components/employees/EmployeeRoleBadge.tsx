@@ -11,6 +11,10 @@ import { ROLE_LABELS, type EmployeeRole } from "@/types/graphql";
 const roleColors: Record<string, string> = {
   SUPER_ADMIN: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border-purple-300",
   ADMIN: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 border-indigo-300",
+  CEO: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 border-violet-300",
+  DCEO: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200 border-sky-300",
+  SMEAL: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-300",
+  HR: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300",
   DIRECTOR: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-300",
   MANAGER: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200 border-cyan-300",
   COORDINATOR: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 border-teal-300",

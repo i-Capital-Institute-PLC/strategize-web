@@ -11,6 +11,7 @@ const roles = [
   "MANAGER",
   "DIRECTOR",
   "HR",
+  "SMEAL",
   "ADMIN",
   "SUPER_ADMIN",
 ] as const;
@@ -19,6 +20,36 @@ describe("route policy", () => {
   it("keeps the structure viewer available to every authenticated role", () => {
     for (const role of roles) {
       expect(canRoleAccessRoute(role, "/dashboard/structure")).toBe(true);
+    }
+    expect(canRoleAccessRoute("DCEO", "/dashboard/structure")).toBe(true);
+  });
+
+  it("allows DCEO read-only access to executive strategy, organization, evaluations, and reports", () => {
+    for (const route of [
+      "/dashboard",
+      "/strategy-period",
+      "/dashboard/strategic-plans",
+      "/dashboard/objectives",
+      "/dashboard/kpis",
+      "/dashboard/structure",
+      "/dashboard/divisions",
+      "/dashboard/departments",
+      "/dashboard/units",
+      "/dashboard/performance",
+      "/dashboard/evaluations",
+      "/dashboard/reports",
+      "/dashboard/approvals",
+    ]) {
+      expect(canRoleAccessRoute("DCEO", route)).toBe(true);
+    }
+    for (const denied of [
+      "/dashboard/checkin",
+      "/dashboard/logbook",
+      "/dashboard/admin",
+      "/strategy-period/new",
+      "/dashboard/reports?tab=submissions",
+    ]) {
+      expect(canRoleAccessRoute("DCEO", denied)).toBe(false);
     }
   });
 

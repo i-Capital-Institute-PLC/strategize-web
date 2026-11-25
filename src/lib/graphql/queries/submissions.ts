@@ -61,9 +61,18 @@ export const GET_PENDING_SUBMISSIONS_LIGHT = gql`
         submittedBy {
           employeeId
           fullName
+          managerId
+          manager {
+            employeeId
+            role
+          }
           departments {
             departmentId
             name
+            head {
+              employeeId
+              role
+            }
           }
         }
         objective {

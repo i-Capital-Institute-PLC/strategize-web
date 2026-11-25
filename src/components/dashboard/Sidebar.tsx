@@ -1,6 +1,6 @@
 "use client";
 import Logo from "@/components/Logo";
-import { canCeoAccessRoute } from '@/lib/rbac/routePolicy';
+import { canCeoAccessRoute, canDceoAccessRoute } from '@/lib/rbac/routePolicy';
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useUIStore } from "@/stores";
@@ -624,7 +624,7 @@ const navCategories: NavCategory[] = [
         label: "Semi-Annual Report",
         href: "/dashboard/semi-annual-report",
         permission: "nav:reports",
-        rolesOnly: ["SUPER_ADMIN", "HR"],
+        rolesOnly: ["SUPER_ADMIN", "HR", "SMEAL"],
         icon: (
           <svg
             width="16"
@@ -707,7 +707,7 @@ const navCategories: NavCategory[] = [
       {
         label: "KPI Formulas",
         href: "/dashboard/admin/kpi-formulas",
-        permission: "nav:admin",
+        permission: "kpis:create_corporate",
         icon: (
           <svg
             width="16"
@@ -736,7 +736,7 @@ const navCategories: NavCategory[] = [
       {
         label: "Semi-Annual Config",
         href: "/dashboard/semi-annual-config",
-        permission: "nav:admin",
+        permission: "kpis:create_corporate",
         icon: (
           <svg
             width="16"
@@ -825,6 +825,7 @@ function CollapsibleCategory({
   const filteredLinks = category.links
     .filter((link) => {
       if (userRole === 'CEO' && !canCeoAccessRoute(link.href)) return false;
+      if (userRole === 'DCEO' && !canDceoAccessRoute(link.href)) return false;
       if (!can(link.permission)) return false;
       if (link.managerOnly && !isManagerRole) return false;
       if (link.rolesOnly && !link.rolesOnly.includes(userRole || "")) return false;

@@ -9,9 +9,11 @@ import type {
 
 const TEAM_ANALYTICS_ROLES = new Set([
   "CEO",
+  "DCEO",
   "MANAGER",
   "DIRECTOR",
   "HR",
+  "SMEAL",
   "ADMIN",
   "SUPER_ADMIN",
 ]);

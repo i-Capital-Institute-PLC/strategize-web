@@ -86,8 +86,11 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const { guards, scope } = usePermissions();
-  const isGlobalAdmin = guards.isAdmin || guards.isSuperAdmin;
-  const canBulkDelete = !readOnly && isGlobalAdmin;
+  const isGlobalAdmin =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL || guards.isHR;
+  const canDeleteDivisions =
+    guards.isAdmin || guards.isSuperAdmin || guards.isSMEAL;
+  const canBulkDelete = !readOnly && canDeleteDivisions;
 
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(
     new Set()
@@ -284,7 +287,7 @@ const DivisionTable: React.FC<DivisionTableProps> = ({
                   (user?.fullName && division.managedBy === user.fullName));
 
               const canManageThisDivision = !readOnly && (isGlobalAdmin || isDivisionHead);
-              const canDeleteThisDivision = !readOnly && isGlobalAdmin;
+              const canDeleteThisDivision = !readOnly && canDeleteDivisions;
 
               return (
               <TableRow

@@ -38,7 +38,9 @@ interface PendingApprovalsCount {
 }
 
 function getApproverRole(userRole: string | undefined): ApproverRole {
-  if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") return "CORPORATE";
+  if (userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "DCEO") {
+    return "CORPORATE";
+  }
   if (userRole === "DIRECTOR") return "DIVISION";
   if (userRole === "MANAGER") return "DEPARTMENT";
   return "CORPORATE";
@@ -102,15 +104,17 @@ export function usePendingApprovalsCount(): PendingApprovalsCount {
   const { scope } = usePermissions();
 
   const approverRole = getApproverRole(user?.role);
+  const isDceo = user?.role === "DCEO";
   const enabledLevels = useMemo(
-    () => inboundLevelsForApprover(approverRole),
-    [approverRole],
+    () => inboundLevelsForApprover(approverRole, isDceo),
+    [approverRole, isDceo],
   );
 
   const shouldMakeQueries = Boolean(
     user && user.role !== 'CEO' &&
       (user.role === "SUPER_ADMIN" ||
         user.role === "ADMIN" ||
+        user.role === "DCEO" ||
         approverRole === "DIVISION" ||
         approverRole === "DEPARTMENT" ||
         selectedUnit),
@@ -273,11 +277,13 @@ export function usePendingApprovalsCount(): PendingApprovalsCount {
       departmentsWithoutDivision,
       departmentsInSelectedDivision,
       effectiveSelectedUnitId,
+      { isDceo, currentUserId: user?.employeeId },
     );
     return hierarchyFiltered.length;
   }, [
     allSubmissions,
     approverRole,
+    isDceo,
     user?.employeeId,
     effectiveSelectedUnitType,
     departmentsWithoutDivision,
@@ -285,12 +291,13 @@ export function usePendingApprovalsCount(): PendingApprovalsCount {
     effectiveSelectedUnitId,
   ]);
 
+  const isExecutiveLogbookApprover = user?.role === "CEO" || user?.role === "DCEO";
   const { data: logbookData, loading: logbookLoading } = useQuery(
     GET_LOGBOOK_PENDING_BADGE,
     {
       variables: {
         entryStatus: "SUBMITTED",
-        approverUserId: user?.role === 'CEO' ? user.employeeId : undefined,
+        approverUserId: isExecutiveLogbookApprover ? user.employeeId : undefined,
         limit: BADGE_LIMIT,
         page: 1,
       },
@@ -302,7 +309,7 @@ export function usePendingApprovalsCount(): PendingApprovalsCount {
   );
 
   const logbookCount = useMemo(() => {
-    if (user?.role === 'CEO') return logbookData?.logbookEntries?.meta?.totalItems ?? 0;
+    if (isExecutiveLogbookApprover) return logbookData?.logbookEntries?.meta?.totalItems ?? 0;
     const entries = logbookData?.logbookEntries?.items || [];
     return entries.filter(
       (e: { owner?: { employeeId?: string } }) =>

@@ -8,7 +8,7 @@ import { AlertCircle } from "lucide-react";
 
 export default function PerformanceWeightsPage() {
   const user = useAuthStore((state) => state.user);
-  const hasAccess = user?.role && ["SUPER_ADMIN", "ADMIN", "HR"].includes(user.role);
+  const hasAccess = user?.role && ["SUPER_ADMIN", "ADMIN", "HR", "SMEAL"].includes(user.role);
 
   if (!hasAccess) {
     return (

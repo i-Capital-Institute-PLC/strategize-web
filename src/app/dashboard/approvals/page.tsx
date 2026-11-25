@@ -180,13 +180,15 @@ export default function ApprovalsPage() {
     ]);
   };
 
+  const isExecutiveLogbookScope = user?.role === 'CEO' || user?.role === 'DCEO';
+
   // Get logbook entries for approval
   // The server enforces the approver's hierarchy; UI checks are an additional safeguard.
   const { data: departmentsData, loading: departmentsLoading } = useQuery(
     GET_LOGBOOK_REVIEW_DEPARTMENTS,
     {
       variables: { page: 1, limit: 1000 },
-      skip: !user?.employeeId || user.role === 'CEO',
+      skip: !user?.employeeId || isExecutiveLogbookScope,
       fetchPolicy: "cache-and-network",
       nextFetchPolicy: "cache-first",
     },
@@ -205,7 +207,7 @@ export default function ApprovalsPage() {
           : undefined,
       approverUserId: user?.employeeId,
       limit: 100,
-      page: user?.role === 'CEO' ? logbookPage : 1,
+      page: isExecutiveLogbookScope ? logbookPage : 1,
     },
     skip: !user?.employeeId,
     fetchPolicy: "cache-and-network",
@@ -251,13 +253,13 @@ export default function ApprovalsPage() {
   );
   const logbookEntries = useMemo(
     () =>
-      (user?.role === 'CEO'
+      (isExecutiveLogbookScope
         ? rawLogbookEntries
         : rawLogbookEntries.filter((entry) =>
             canReviewLogbookOwner(entry.owner, user, reviewDepartments),
           )
       ).filter((entry) => String(entry.entryStatus || "").toUpperCase() !== "DRAFT"), // Managers must never see draft logbook entries
-    [rawLogbookEntries, user, reviewDepartments],
+    [rawLogbookEntries, user, reviewDepartments, isExecutiveLogbookScope],
   );
 
   const getStatusBadge = (status: string) => {
@@ -327,7 +329,7 @@ export default function ApprovalsPage() {
   // Coordinators and above can access approvals
   // NORMAL users can only view their own submissions
   const canAccessApprovals =
-    user?.role === 'CEO' || guards.isEmployee || guards.canApprove || guards.isCoordinator;
+    user?.role === 'CEO' || user?.role === 'DCEO' || guards.isEmployee || guards.canApprove || guards.isCoordinator;
 
   if (!canAccessApprovals) {
     return (
@@ -535,7 +537,7 @@ export default function ApprovalsPage() {
                 </div>
 
                 {/* Logbook Table */}
-                {user?.role === 'CEO' && logbookError ? (
+                {isExecutiveLogbookScope && logbookError ? (
                   <p role="alert" className="text-destructive">Could not load leadership approvals. {logbookError.message}</p>
                 ) : logbookLoading || departmentsLoading ? (
                   <div className="bg-white dark:bg-[#18181b] rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
@@ -666,7 +668,7 @@ export default function ApprovalsPage() {
                     </Table>
                   </div>
                 )}
-                {user?.role === 'CEO' && (
+                {isExecutiveLogbookScope && (
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm text-muted-foreground">Page {logbookPage} · {logbookData?.logbookEntries?.meta?.totalItems ?? 0} leadership entries</p>
                     <div className="flex gap-2">

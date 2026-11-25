@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { gql, useQuery } from "@apollo/client";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Users } from "lucide-react";
+import { Building2, ChevronDown, User, Users } from "lucide-react";
 import { useAuthStore, useStrategicPeriodStore } from "@/stores";
+import { Button } from "@/components/ui/button";
 import AnalyticsSummary from "@/components/dashboard/AnalyticsSummary";
 import EmployeeLifecycleBanner from "@/components/dashboard/EmployeeLifecycleBanner";
 
@@ -72,20 +74,26 @@ const GET_DEPARTMENTS_QUERY = gql`
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
   const { selectedPeriod, selectionValidated } = useStrategicPeriodStore();
+  const hasDualDashboard = user?.role === "SMEAL" || user?.role === "HR";
+  const [dashboardView, setDashboardView] = useState<"organization" | "personal">(
+    "organization",
+  );
+  const isPersonalMode = hasDualDashboard && dashboardView === "personal";
 
   const primaryDept = user?.departments?.[0];
   const userDepartmentId = primaryDept?.departmentId;
   const userDivisionId = (primaryDept as any)?.division?.divisionId;
 
-  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "HR", "CEO"]);
+  const fullAccessRoles = new Set(["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO"]);
   const hasFullAccess =
     !!user?.role && fullAccessRoles.has(user.role as string);
   const isDirector = user?.role === "DIRECTOR";
   const isManager = user?.role === "MANAGER" || user?.role === "COORDINATOR";
-  const isLeadershipRole = hasFullAccess || isDirector || isManager;
+  const isLeadershipRole =
+    !isPersonalMode && (hasFullAccess || isDirector || isManager);
   const organizationId = user?.organizationId;
   const canLoadOrganizationHeatMap =
-    Boolean(organizationId) && (hasFullAccess || isDirector);
+    !isPersonalMode && Boolean(organizationId) && (hasFullAccess || isDirector);
 
   // Fetch team performance for health metrics
   let teamFilters: any = {
@@ -141,10 +149,46 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-[1600px] space-y-7 pb-8">
       <EmployeeLifecycleBanner />
-      <AnalyticsSummary />
+      {hasDualDashboard && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-xs dark:border-white/[0.08] dark:bg-zinc-900/90">
+          <div>
+            <p className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+              {isPersonalMode
+                ? "My Employee Dashboard"
+                : `${user?.role === "SMEAL" ? "Corporate / SMEAL" : "Organization / HR"} Dashboard`}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Switch between your personal employee KPIs and organization-wide oversight.
+            </p>
+          </div>
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100/80 p-1 dark:border-zinc-800 dark:bg-zinc-950/70">
+            <Button
+              type="button"
+              size="sm"
+              variant={dashboardView === "organization" ? "default" : "ghost"}
+              onClick={() => setDashboardView("organization")}
+              className="h-8 gap-1.5 rounded-lg text-xs"
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              Corporate View
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={dashboardView === "personal" ? "default" : "ghost"}
+              onClick={() => setDashboardView("personal")}
+              className="h-8 gap-1.5 rounded-lg text-xs"
+            >
+              <User className="h-3.5 w-3.5" />
+              My Employee View
+            </Button>
+          </div>
+        </div>
+      )}
+      <AnalyticsSummary viewMode={isPersonalMode ? "personal" : "organization"} />
 
       {/* Approved, server-scoped quarterly performance is the dashboard authority. */}
-      <QuarterlyPerformanceOverview />
+      <QuarterlyPerformanceOverview viewMode={isPersonalMode ? "personal" : "organization"} />
 
       {isLeadershipRole && teamPerformance && (
         <details className="group/people overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-md transition-all duration-200 hover:border-slate-300 dark:border-white/[0.08] dark:bg-zinc-900/90">

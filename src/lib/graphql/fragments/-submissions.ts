@@ -17,9 +17,18 @@ export const SubmissionsFragment = gql`
       employeeId
       fullName
       email
+      managerId
+      manager {
+        employeeId
+        role
+      }
       departments {
         departmentId
         name
+        head {
+          employeeId
+          role
+        }
       }
     }
     actionedBy {

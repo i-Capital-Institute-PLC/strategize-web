@@ -49,7 +49,7 @@ interface PerformanceReportProps {
   onExport?: (data: unknown) => void;
 }
 
-const FULL_ACCESS_ROLES = new Set(["SUPER_ADMIN", "ADMIN", "HR", "CEO"]);
+const FULL_ACCESS_ROLES = new Set(["SUPER_ADMIN", "ADMIN", "SMEAL", "HR", "CEO", "DCEO"]);
 const MANAGER_ROLES = new Set(["DIRECTOR", "MANAGER"]);
 
 export default function PerformanceReport({

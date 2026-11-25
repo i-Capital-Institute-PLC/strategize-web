@@ -1,11 +1,13 @@
 // GraphQL Enums
 export const EmployeeRole = {
   CEO: "CEO",
+  DCEO: "DCEO",
   NORMAL: "NORMAL",
   COORDINATOR: "COORDINATOR",
   MANAGER: "MANAGER",
   DIRECTOR: "DIRECTOR",
   HR: "HR",
+  SMEAL: "SMEAL",
   ADMIN: "ADMIN",
   SUPER_ADMIN: "SUPER_ADMIN",
 } as const;
@@ -15,11 +17,13 @@ export type EmployeeRole = (typeof EmployeeRole)[keyof typeof EmployeeRole];
 // Role hierarchy for display and permissions
 export const ROLE_HIERARCHY = [
   "CEO",
+  "DCEO",
   "NORMAL",
   "COORDINATOR",
   "MANAGER",
   "DIRECTOR",
   "HR",
+  "SMEAL",
   "ADMIN",
   "SUPER_ADMIN",
 ] as const;
@@ -27,11 +31,13 @@ export const ROLE_HIERARCHY = [
 // Human-readable role labels
 export const ROLE_LABELS: Record<EmployeeRole, string> = {
   CEO: "CEO",
+  DCEO: "Deputy CEO",
   NORMAL: "Employee",
   COORDINATOR: "Coordinator",
   MANAGER: "Manager",
   DIRECTOR: "Director",
   HR: "HR",
+  SMEAL: "SMEAL",
   ADMIN: "Admin",
   SUPER_ADMIN: "Super Admin",
 };
@@ -645,6 +651,8 @@ export interface KpiQuarterReportKpiRollup {
   parentKpiId?: string | null;
   measurementUnit: KpiMeasurementUnit;
   unitType?: KpiUnitType | null;
+  strategicPillarName?: string | null;
+  kpiCategory?: string | null;
   customUnitLabel?: string | null;
   quarterlyAggregationMethod?: KpiQuarterlyAggregationMethod | null;
   calculationType: KpiCalculationType;
@@ -707,6 +715,8 @@ export interface KpiQuarterReportRow {
   weightingBasisKpiName?: string | null;
   unitType?: KpiUnitType | null;
   measurementUnit: string;
+  strategicPillarName?: string | null;
+  kpiCategory?: string | null;
   customUnitLabel?: string | null;
   annualTarget: number;
   weight: number;
@@ -768,6 +778,7 @@ export interface KpiQuarterPerformanceReport {
   availableFilters: {
     divisions: KpiQuarterReportFilterOption[];
     departments: KpiQuarterReportFilterOption[];
+    units?: KpiQuarterReportFilterOption[];
     employees: KpiQuarterReportFilterOption[];
   };
   summary: KpiQuarterReportSummary;
